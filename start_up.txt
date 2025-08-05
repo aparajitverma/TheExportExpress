@@ -1,0 +1,265 @@
+===========================================
+EXPORTEXPRESSPRO STARTUP GUIDE
+===========================================
+
+This guide contains all the commands needed to start the complete ExportExpressPro system.
+
+PREREQUISITES:
+- Node.js (v16 or higher)
+- npm or yarn
+- Docker and Docker Compose
+- Git
+
+===========================================
+STEP 1: START INFRASTRUCTURE SERVICES
+===========================================
+
+# Navigate to the main project directory
+cd C:\Users\welcome\Downloads\TheExportExpress-main
+
+# Start MongoDB and Redis using Docker Compose
+docker-compose up -d mongodb redis
+
+# Verify containers are running
+docker ps
+
+===========================================
+STEP 2: START BACKEND SERVER
+===========================================
+
+# Navigate to backend directory
+cd TheExportExpress-main\backend
+
+# Install dependencies (if not already installed)
+npm install
+
+# Seed the database with initial data
+npm run seed:all
+
+# Start the backend development server
+npm run dev
+
+# The backend will start on port 3000 (or next available port)
+# You should see: "Server is running on http://127.0.0.1:3000"
+
+===========================================
+STEP 3: START FRONTEND WEBSITE
+===========================================
+
+# Open a new terminal window
+# Navigate to frontend directory
+cd C:\Users\welcome\Downloads\TheExportExpress-main\TheExportExpress-main\frontend
+
+# Install dependencies (if not already installed)
+npm install
+
+# Start the frontend development server
+npm run dev
+
+# The frontend will start on http://localhost:5173
+
+===========================================
+STEP 4: START WEBSITE INTEGRATION SERVICE
+===========================================
+
+# Open a new terminal window
+# Navigate to website integration directory
+cd C:\Users\welcome\Downloads\TheExportExpress-main\website-integration
+
+# Install dependencies (if not already installed)
+npm install
+
+# Start the website integration service (WebSocket server)
+npm run dev
+
+# The service will start on port 3001
+# You should see: "Website integration service running on port 3001"
+
+===========================================
+STEP 5: START DESKTOP APPLICATION
+===========================================
+
+# Open a new terminal window
+# Navigate to desktop app directory
+cd C:\Users\welcome\Downloads\TheExportExpress-main\desktop-app
+
+# Install dependencies (if not already installed)
+npm install
+
+# Start the Tauri desktop application
+npm run tauri dev
+
+# The desktop app will open automatically
+
+===========================================
+STEP 6: START AI ENGINE (OPTIONAL)
+===========================================
+
+# Open a new terminal window
+# Navigate to AI engine directory
+cd C:\Users\welcome\Downloads\TheExportExpress-main\ai-engine
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Start the AI engine
+python src/main.py
+
+# The AI engine will start on port 8001
+
+===========================================
+VERIFICATION COMMANDS
+===========================================
+
+# Test backend health
+Invoke-RestMethod -Uri "http://localhost:3000/api/health"
+
+# Test login (PowerShell)
+Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method POST -ContentType "application/json" -Body '{"email":"admin@example.com","password":"Admin@123"}'
+
+# Test authentication with token
+$token = (Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method POST -ContentType "application/json" -Body '{"email":"admin@example.com","password":"Admin@123"}').data.token
+Invoke-RestMethod -Uri "http://localhost:3000/api/auth/me" -Headers @{"Authorization"="Bearer $token"}
+
+# Test products endpoint
+Invoke-RestMethod -Uri "http://localhost:3000/api/products"
+
+# Check if frontend is running
+netstat -an | findstr :5173
+
+# Check if website integration service is running
+netstat -an | findstr :3001
+
+# Check if desktop app is running
+netstat -an | findstr :1421
+
+===========================================
+ACCESS URLs
+===========================================
+
+Frontend Website: http://localhost:5173
+Backend API: http://localhost:3000
+Website Integration (WebSocket): http://localhost:3001
+Desktop App: http://localhost:1421
+AI Engine: http://localhost:8001
+
+===========================================
+DEFAULT LOGIN CREDENTIALS
+===========================================
+
+Email: admin@example.com
+Password: Admin@123
+
+===========================================
+TROUBLESHOOTING
+===========================================
+
+1. If MongoDB connection fails:
+   - Ensure Docker is running
+   - Run: docker-compose up -d mongodb redis
+
+2. If backend fails to start:
+   - Check if port 3000 is available
+   - Backend will automatically try ports 3001, 3002, 3003
+
+3. If frontend can't connect to backend:
+   - Visit http://localhost:5173/test to run connection tests
+   - Check browser console for CORS errors
+
+4. If desktop app fails to build:
+   - Ensure Rust toolchain is installed
+   - Run: rustup update
+
+5. If login fails:
+   - Ensure database is seeded: npm run seed:all
+   - Check backend logs for errors
+   - Clear browser localStorage: localStorage.clear() in browser console
+   - Clear old tokens: localStorage.removeItem('token')
+
+6. If you see "Invalid token" errors:
+   - Clear browser cache and localStorage
+   - Restart the frontend application
+   - Check if backend JWT_SECRET_KEY is consistent
+   - Ensure backend is running on the expected port
+
+7. If desktop app shows WebSocket connection errors:
+   - Ensure website integration service is running on port 3001
+   - Check if port 3001 is available: netstat -an | findstr :3001
+   - Restart the website integration service: npm run dev
+   - Verify WebSocket server is accessible: http://localhost:3001/health
+
+===========================================
+STOPPING SERVICES
+===========================================
+
+# Stop all Docker containers
+docker-compose down
+
+# Stop backend (Ctrl+C in backend terminal)
+# Stop frontend (Ctrl+C in frontend terminal)
+# Stop desktop app (Ctrl+C in desktop terminal)
+# Stop AI engine (Ctrl+C in AI engine terminal)
+
+===========================================
+QUICK START SCRIPT (POWERSHELL)
+===========================================
+
+# Copy and paste this into PowerShell for quick startup:
+
+# Start infrastructure
+cd C:\Users\welcome\Downloads\TheExportExpress-main
+docker-compose up -d mongodb redis
+
+# Start backend
+cd TheExportExpress-main\backend
+npm run dev
+
+# Start frontend (in new terminal)
+cd C:\Users\welcome\Downloads\TheExportExpress-main\TheExportExpress-main\frontend
+npm run dev
+
+# Start website integration service (in new terminal)
+cd C:\Users\welcome\Downloads\TheExportExpress-main\website-integration
+npm run dev
+
+# Start desktop app (in new terminal)
+cd C:\Users\welcome\Downloads\TheExportExpress-main\desktop-app
+npm run tauri dev
+
+===========================================
+FRONTEND TROUBLESHOOTING
+==========================================
+
+If you encounter authentication issues in the frontend:
+
+1. Clear browser data:
+   - Open browser console (F12)
+   - Run: localStorage.clear()
+   - Refresh the page
+
+2. Test connection manually:
+   - Visit: http://localhost:5173/test
+   - Click "Test Login" button
+   - Check browser console for errors
+
+3. Verify backend is accessible:
+   - Open: http://localhost:3000/api/health
+   - Should show: {"status":"UP","message":"API is healthy"}
+
+4. Check CORS issues:
+   - Ensure backend is running on correct port
+   - Check browser console for CORS errors
+   - Verify frontend is connecting to correct backend URL
+
+==========================================
+NOTES
+===========================================
+
+- All services must be running for full functionality
+- The backend automatically seeds the database on first run
+- The desktop app includes the frontend and backend in one application
+- The AI engine is optional and used for advanced features
+- All passwords and secrets are hardcoded for development
+- For production, use environment variables
+
+=========================================== 

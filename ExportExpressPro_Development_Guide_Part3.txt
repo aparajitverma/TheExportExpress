@@ -1,0 +1,700 @@
+# ExportExpressPro - Development Guide Part 3: AI Engine & Market Intelligence
+
+---
+
+## PHASE 2: AI ENGINE IMPLEMENTATION (Months 3-4)
+
+### **2.1 Python AI Service Foundation**
+
+#### **FastAPI Application Setup (ai-engine/src/main.py):**
+```python
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+import asyncio
+import uvicorn
+from datetime import datetime, timedelta
+import logging
+
+# Custom modules
+from models.prediction_models import PricePredictionModel, ArbitragePredictionModel
+from services.market_analyzer import MarketAnalyzer
+from services.news_processor import NewsProcessor
+from database.mongodb_client import MongoDBClient
+from database.redis_client import RedisClient
+from utils.websocket_manager import WebSocketManager
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="ExportExpressPro AI Engine",
+    description="AI-powered market analysis and prediction service",
+    version="1.0.0"
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure appropriately for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Global instances
+db_client = MongoDBClient()
+redis_client = RedisClient()
+websocket_manager = WebSocketManager()
+market_analyzer = MarketAnalyzer(db_client, redis_client)
+news_processor = NewsProcessor(db_client)
+price_model = PricePredictionModel()
+arbitrage_model = ArbitragePredictionModel()
+
+# Request/Response models
+class PredictionRequest(BaseModel):
+    product_id: str
+    timeframe: int = 3  # days
+    include_arbitrage: bool = True
+
+class MarketAnalysisRequest(BaseModel):
+    product_ids: List[str]
+    markets: List[str]
+    analysis_type: str = "arbitrage"
+
+class PredictionResponse(BaseModel):
+    product_id: str
+    predictions: Dict[str, Any]
+    arbitrage_opportunities: List[Dict[str, Any]]
+    confidence: float
+    generated_at: datetime
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    logging.info("Starting AI Engine...")
+    
+    # Initialize database connections
+    await db_client.connect()
+    await redis_client.connect()
+    
+    # Load ML models
+    await price_model.load_model()
+    await arbitrage_model.load_model()
+    
+    # Start background tasks
+    asyncio.create_task(continuous_market_analysis())
+    asyncio.create_task(news_monitoring())
+    
+    logging.info("AI Engine started successfully")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    await db_client.disconnect()
+    await redis_client.disconnect()
+    logging.info("AI Engine shut down")
+
+# API Endpoints
+
+@app.get("/")
+async def root():
+    return {"message": "ExportExpressPro AI Engine", "status": "running"}
+
+@app.post("/predict", response_model=PredictionResponse)
+async def predict_price_and_arbitrage(request: PredictionRequest):
+    """Generate price predictions and arbitrage opportunities"""
+    try:
+        # Get product data
+        product = await db_client.get_product(request.product_id)
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        # Generate price predictions
+        price_predictions = await price_model.predict(
+            product_id=request.product_id,
+            timeframe=request.timeframe
+        )
+        
+        # Generate arbitrage opportunities if requested
+        arbitrage_opportunities = []
+        if request.include_arbitrage:
+            arbitrage_opportunities = await arbitrage_model.find_opportunities(
+                product_id=request.product_id,
+                current_price=product['pricing']['current_price']
+            )
+        
+        # Calculate overall confidence
+        confidence = min(
+            price_predictions.get('confidence', 0.5),
+            max([opp.get('confidence', 0.5) for opp in arbitrage_opportunities] + [0.5])
+        )
+        
+        # Store predictions in database
+        prediction_data = {
+            "product_id": request.product_id,
+            "timestamp": datetime.utcnow(),
+            "predictions": price_predictions,
+            "arbitrage_opportunities": arbitrage_opportunities,
+            "confidence": confidence
+        }
+        
+        await db_client.store_prediction(prediction_data)
+        
+        # Send real-time update
+        await websocket_manager.broadcast({
+            "type": "prediction_update",
+            "product_id": request.product_id,
+            "predictions": price_predictions,
+            "arbitrage_opportunities": arbitrage_opportunities
+        })
+        
+        return PredictionResponse(
+            product_id=request.product_id,
+            predictions=price_predictions,
+            arbitrage_opportunities=arbitrage_opportunities,
+            confidence=confidence,
+            generated_at=datetime.utcnow()
+        )
+        
+    except Exception as e:
+        logging.error(f"Prediction error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/market-analysis")
+async def analyze_market(request: MarketAnalysisRequest):
+    """Perform comprehensive market analysis"""
+    try:
+        analysis_result = await market_analyzer.analyze_multiple_products(
+            product_ids=request.product_ids,
+            target_markets=request.markets,
+            analysis_type=request.analysis_type
+        )
+        
+        return {
+            "analysis": analysis_result,
+            "generated_at": datetime.utcnow(),
+            "products_analyzed": len(request.product_ids),
+            "markets_analyzed": len(request.markets)
+        }
+        
+    except Exception as e:
+        logging.error(f"Market analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/opportunities")
+async def get_current_opportunities():
+    """Get current arbitrage opportunities"""
+    try:
+        # Get opportunities from cache first
+        cached_opportunities = await redis_client.get("current_opportunities")
+        if cached_opportunities:
+            return cached_opportunities
+        
+        # Generate new opportunities
+        opportunities = await arbitrage_model.get_all_opportunities()
+        
+        # Cache for 5 minutes
+        await redis_client.set("current_opportunities", opportunities, expire=300)
+        
+        return {
+            "opportunities": opportunities,
+            "count": len(opportunities),
+            "generated_at": datetime.utcnow()
+        }
+        
+    except Exception as e:
+        logging.error(f"Opportunities error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/market-trends/{product_id}")
+async def get_market_trends(product_id: str, days: int = 30):
+    """Get market trends for a specific product"""
+    try:
+        trends = await market_analyzer.get_product_trends(product_id, days)
+        return {
+            "product_id": product_id,
+            "trends": trends,
+            "period_days": days,
+            "generated_at": datetime.utcnow()
+        }
+        
+    except Exception as e:
+        logging.error(f"Market trends error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Background Tasks
+
+async def continuous_market_analysis():
+    """Continuous background market analysis"""
+    while True:
+        try:
+            logging.info("Running continuous market analysis...")
+            
+            # Get all active products
+            active_products = await db_client.get_active_products()
+            
+            for product in active_products:
+                try:
+                    # Generate predictions for each product
+                    predictions = await price_model.predict(
+                        product_id=product['_id'],
+                        timeframe=3
+                    )
+                    
+                    # Check for arbitrage opportunities
+                    opportunities = await arbitrage_model.find_opportunities(
+                        product_id=product['_id'],
+                        current_price=product['pricing']['current_price']
+                    )
+                    
+                    # Store results
+                    if predictions or opportunities:
+                        await db_client.store_prediction({
+                            "product_id": product['_id'],
+                            "timestamp": datetime.utcnow(),
+                            "predictions": predictions,
+                            "arbitrage_opportunities": opportunities,
+                            "auto_generated": True
+                        })
+                        
+                        # Send alerts for high-confidence opportunities
+                        for opp in opportunities:
+                            if opp.get('confidence', 0) > 0.8:
+                                await websocket_manager.broadcast({
+                                    "type": "arbitrage_opportunity",
+                                    "product_id": product['_id'],
+                                    "product_name": product['name'],
+                                    "opportunity": opp,
+                                    "alert_level": "high"
+                                })
+                    
+                except Exception as e:
+                    logging.error(f"Error analyzing product {product['_id']}: {str(e)}")
+                    continue
+            
+            logging.info(f"Analyzed {len(active_products)} products")
+            
+        except Exception as e:
+            logging.error(f"Continuous analysis error: {str(e)}")
+        
+        # Wait 10 minutes before next analysis
+        await asyncio.sleep(600)
+
+async def news_monitoring():
+    """Monitor news for market impact"""
+    while True:
+        try:
+            logging.info("Processing news for market impact...")
+            
+            # Process latest news
+            news_impact = await news_processor.process_latest_news()
+            
+            # Update market intelligence based on news
+            for impact in news_impact:
+                if impact['severity'] > 0.5:  # High impact news
+                    await websocket_manager.broadcast({
+                        "type": "market_alert",
+                        "message": impact['summary'],
+                        "affected_products": impact['affected_products'],
+                        "severity": impact['severity'],
+                        "source": "news_analysis"
+                    })
+            
+        except Exception as e:
+            logging.error(f"News monitoring error: {str(e)}")
+        
+        # Wait 15 minutes before next news check
+        await asyncio.sleep(900)
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8001,
+        reload=True,
+        log_level="info"
+    )
+```
+
+### **2.2 Price Prediction Models**
+
+#### **Price Prediction Model (ai-engine/src/models/prediction_models.py):**
+```python
+import numpy as np
+import pandas as pd
+from datetime import datetime, timedelta
+import logging
+from typing import Dict, List, Optional, Any
+import pickle
+import os
+
+import tensorflow as tf
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+
+class PricePredictionModel:
+    """LSTM-based price prediction model"""
+    
+    def __init__(self):
+        self.model = None
+        self.scaler = MinMaxScaler()
+        self.sequence_length = 30  # Use 30 days of historical data
+        self.features = [
+            'price', 'volume', 'demand_score', 'supply_score',
+            'seasonal_factor', 'news_sentiment', 'economic_indicator'
+        ]
+        self.model_path = "models/price_prediction_model.h5"
+        self.scaler_path = "models/price_scaler.pkl"
+    
+    async def load_model(self):
+        """Load pre-trained model or create new one"""
+        try:
+            if os.path.exists(self.model_path):
+                self.model = tf.keras.models.load_model(self.model_path)
+                with open(self.scaler_path, 'rb') as f:
+                    self.scaler = pickle.load(f)
+                logging.info("Price prediction model loaded successfully")
+            else:
+                await self.create_and_train_model()
+        except Exception as e:
+            logging.error(f"Error loading price model: {str(e)}")
+            await self.create_and_train_model()
+    
+    async def create_and_train_model(self):
+        """Create and train a new LSTM model"""
+        try:
+            # Create LSTM model architecture
+            self.model = tf.keras.Sequential([
+                tf.keras.layers.LSTM(50, return_sequences=True, input_shape=(self.sequence_length, len(self.features))),
+                tf.keras.layers.Dropout(0.2),
+                tf.keras.layers.LSTM(50, return_sequences=True),
+                tf.keras.layers.Dropout(0.2),
+                tf.keras.layers.LSTM(50),
+                tf.keras.layers.Dropout(0.2),
+                tf.keras.layers.Dense(25),
+                tf.keras.layers.Dense(1)
+            ])
+            
+            self.model.compile(
+                optimizer='adam',
+                loss='mean_squared_error',
+                metrics=['mae']
+            )
+            
+            # For now, create a basic model
+            # In production, you would train with historical data
+            logging.info("Created new price prediction model")
+            
+        except Exception as e:
+            logging.error(f"Error creating price model: {str(e)}")
+    
+    async def predict(self, product_id: str, timeframe: int = 3) -> Dict[str, Any]:
+        """Predict price for given timeframe"""
+        try:
+            # Get historical data for the product
+            historical_data = await self._get_historical_data(product_id)
+            
+            if len(historical_data) < self.sequence_length:
+                # Use simple trend analysis for products with limited history
+                return await self._simple_price_prediction(historical_data, timeframe)
+            
+            # Prepare data for LSTM
+            X = self._prepare_data_for_prediction(historical_data)
+            
+            # Generate predictions
+            predictions = {}
+            current_price = historical_data[-1]['price']
+            
+            for days in [1, 3, 7]:
+                if days <= timeframe:
+                    # Simulate prediction (replace with actual model prediction)
+                    price_change = np.random.normal(0, 0.05)  # 5% volatility
+                    predicted_price = current_price * (1 + price_change)
+                    
+                    confidence = max(0.1, 1.0 - (days * 0.1))  # Decreasing confidence
+                    
+                    predictions[f"price_{days}_days"] = {
+                        "value": round(predicted_price, 2),
+                        "confidence": round(confidence, 2),
+                        "change_percentage": round(price_change * 100, 2),
+                        "factors": self._identify_price_factors(historical_data)
+                    }
+            
+            return predictions
+            
+        except Exception as e:
+            logging.error(f"Price prediction error for {product_id}: {str(e)}")
+            return {}
+    
+    async def _get_historical_data(self, product_id: str) -> List[Dict]:
+        """Get historical price data for product"""
+        # This would typically fetch from database
+        # For now, simulate historical data
+        base_price = 2500
+        data = []
+        
+        for i in range(60):  # 60 days of data
+            date = datetime.now() - timedelta(days=60-i)
+            price = base_price * (1 + np.random.normal(0, 0.03))  # 3% daily volatility
+            
+            data.append({
+                "date": date,
+                "price": price,
+                "volume": np.random.randint(100, 1000),
+                "demand_score": np.random.uniform(0.3, 0.9),
+                "supply_score": np.random.uniform(0.3, 0.9),
+                "seasonal_factor": 0.5 + 0.3 * np.sin(2 * np.pi * i / 365),
+                "news_sentiment": np.random.uniform(-0.2, 0.2),
+                "economic_indicator": np.random.uniform(-0.1, 0.1)
+            })
+        
+        return data
+    
+    def _prepare_data_for_prediction(self, historical_data: List[Dict]) -> np.ndarray:
+        """Prepare historical data for LSTM input"""
+        # Convert to DataFrame
+        df = pd.DataFrame(historical_data)
+        
+        # Select features
+        feature_data = df[self.features].values
+        
+        # Scale the data
+        scaled_data = self.scaler.fit_transform(feature_data)
+        
+        # Create sequences
+        X = []
+        for i in range(self.sequence_length, len(scaled_data)):
+            X.append(scaled_data[i-self.sequence_length:i])
+        
+        return np.array(X)
+    
+    async def _simple_price_prediction(self, historical_data: List[Dict], timeframe: int) -> Dict[str, Any]:
+        """Simple trend-based prediction for products with limited history"""
+        if not historical_data:
+            return {}
+        
+        prices = [d['price'] for d in historical_data[-10:]]  # Last 10 data points
+        current_price = prices[-1]
+        
+        # Calculate simple trend
+        if len(prices) > 1:
+            trend = (prices[-1] - prices[0]) / len(prices)
+        else:
+            trend = 0
+        
+        predictions = {}
+        for days in [1, 3, 7]:
+            if days <= timeframe:
+                predicted_price = current_price + (trend * days)
+                confidence = 0.6 if len(prices) > 5 else 0.4
+                
+                predictions[f"price_{days}_days"] = {
+                    "value": round(predicted_price, 2),
+                    "confidence": confidence,
+                    "change_percentage": round((predicted_price - current_price) / current_price * 100, 2),
+                    "factors": ["limited_history", "trend_analysis"]
+                }
+        
+        return predictions
+    
+    def _identify_price_factors(self, historical_data: List[Dict]) -> List[str]:
+        """Identify key factors affecting price"""
+        factors = []
+        
+        recent_data = historical_data[-7:]  # Last week
+        
+        # Check trends
+        prices = [d['price'] for d in recent_data]
+        if len(prices) > 1:
+            if prices[-1] > prices[0] * 1.05:
+                factors.append("increasing_trend")
+            elif prices[-1] < prices[0] * 0.95:
+                factors.append("decreasing_trend")
+        
+        # Check demand/supply balance
+        avg_demand = np.mean([d['demand_score'] for d in recent_data])
+        avg_supply = np.mean([d['supply_score'] for d in recent_data])
+        
+        if avg_demand > avg_supply + 0.2:
+            factors.append("high_demand")
+        elif avg_supply > avg_demand + 0.2:
+            factors.append("excess_supply")
+        
+        # Check sentiment
+        avg_sentiment = np.mean([d['news_sentiment'] for d in recent_data])
+        if avg_sentiment > 0.1:
+            factors.append("positive_sentiment")
+        elif avg_sentiment < -0.1:
+            factors.append("negative_sentiment")
+        
+        return factors if factors else ["normal_conditions"]
+
+class ArbitragePredictionModel:
+    """Model for detecting arbitrage opportunities"""
+    
+    def __init__(self):
+        self.model = None
+        self.confidence_threshold = 0.7
+        self.min_profit_margin = 0.07  # 7% minimum profit
+    
+    async def load_model(self):
+        """Load arbitrage detection model"""
+        # For now, use rule-based approach
+        # In production, train ML model on historical arbitrage successes
+        logging.info("Arbitrage model loaded (rule-based)")
+    
+    async def find_opportunities(self, product_id: str, current_price: float) -> List[Dict[str, Any]]:
+        """Find arbitrage opportunities for a product"""
+        try:
+            opportunities = []
+            
+            # Get market data for different regions
+            market_data = await self._get_market_data(product_id)
+            
+            for market, data in market_data.items():
+                opportunity = await self._analyze_arbitrage_opportunity(
+                    product_id, current_price, market, data
+                )
+                
+                if opportunity and opportunity['confidence'] >= self.confidence_threshold:
+                    opportunities.append(opportunity)
+            
+            # Sort by profit potential
+            opportunities.sort(key=lambda x: x['net_profit'], reverse=True)
+            
+            return opportunities[:5]  # Return top 5 opportunities
+            
+        except Exception as e:
+            logging.error(f"Arbitrage analysis error: {str(e)}")
+            return []
+    
+    async def _get_market_data(self, product_id: str) -> Dict[str, Dict]:
+        """Get market data for different regions"""
+        # Simulate market data
+        markets = {
+            "US": {
+                "price": np.random.uniform(3500, 4500),
+                "demand": np.random.uniform(0.6, 0.9),
+                "import_duty": 0.05,
+                "shipping_cost": 300,
+                "documentation_cost": 150,
+                "lead_time": 10
+            },
+            "EU": {
+                "price": np.random.uniform(3200, 4200),
+                "demand": np.random.uniform(0.5, 0.8),
+                "import_duty": 0.08,
+                "shipping_cost": 250,
+                "documentation_cost": 200,
+                "lead_time": 12
+            },
+            "UAE": {
+                "price": np.random.uniform(3800, 4800),
+                "demand": np.random.uniform(0.7, 0.9),
+                "import_duty": 0.02,
+                "shipping_cost": 150,
+                "documentation_cost": 100,
+                "lead_time": 5
+            }
+        }
+        
+        return markets
+    
+    async def _analyze_arbitrage_opportunity(
+        self, 
+        product_id: str, 
+        current_price: float, 
+        market: str, 
+        market_data: Dict
+    ) -> Optional[Dict[str, Any]]:
+        """Analyze arbitrage opportunity for specific market"""
+        
+        target_price = market_data['price']
+        shipping_cost = market_data['shipping_cost']
+        documentation_cost = market_data['documentation_cost']
+        import_duty = market_data['import_duty']
+        
+        # Calculate total costs
+        total_cost = current_price + shipping_cost + documentation_cost
+        total_cost_with_duty = total_cost * (1 + import_duty)
+        
+        # Calculate profit
+        gross_profit = target_price - total_cost_with_duty
+        profit_margin = gross_profit / total_cost_with_duty if total_cost_with_duty > 0 else 0
+        
+        # Check if opportunity meets criteria
+        if profit_margin < self.min_profit_margin:
+            return None
+        
+        # Calculate confidence based on multiple factors
+        confidence = self._calculate_confidence(market_data, profit_margin)
+        
+        return {
+            "market": market,
+            "buy_price": current_price,
+            "sell_price": target_price,
+            "shipping_cost": shipping_cost,
+            "documentation_cost": documentation_cost,
+            "import_duty_rate": import_duty,
+            "total_costs": total_cost_with_duty,
+            "gross_profit": gross_profit,
+            "net_profit": gross_profit * 0.9,  # Account for additional costs
+            "profit_margin": profit_margin,
+            "confidence": confidence,
+            "lead_time": market_data['lead_time'],
+            "risk_factors": self._identify_risk_factors(market_data),
+            "optimal_quantity": self._calculate_optimal_quantity(gross_profit, market_data),
+            "expires_at": datetime.utcnow() + timedelta(hours=6)  # Opportunity expires in 6 hours
+        }
+    
+    def _calculate_confidence(self, market_data: Dict, profit_margin: float) -> float:
+        """Calculate confidence score for arbitrage opportunity"""
+        confidence = 0.5  # Base confidence
+        
+        # Higher profit margin increases confidence
+        confidence += min(profit_margin * 2, 0.3)
+        
+        # Higher demand increases confidence
+        confidence += market_data['demand'] * 0.2
+        
+        # Lower lead time increases confidence
+        lead_time_factor = max(0, (20 - market_data['lead_time']) / 20 * 0.2)
+        confidence += lead_time_factor
+        
+        return min(confidence, 1.0)
+    
+    def _identify_risk_factors(self, market_data: Dict) -> List[str]:
+        """Identify risk factors for the opportunity"""
+        risks = []
+        
+        if market_data['lead_time'] > 15:
+            risks.append("long_lead_time")
+        
+        if market_data['import_duty'] > 0.1:
+            risks.append("high_import_duty")
+        
+        if market_data['demand'] < 0.6:
+            risks.append("low_demand")
+        
+        return risks if risks else ["low_risk"]
+    
+    def _calculate_optimal_quantity(self, gross_profit: float, market_data: Dict) -> str:
+        """Calculate optimal quantity for the arbitrage"""
+        if gross_profit > 1000:
+            return "200-500kg"
+        elif gross_profit > 500:
+            return "100-200kg"
+        else:
+            return "50-100kg"
+    
+    async def get_all_opportunities(self) -> List[Dict[str, Any]]:
+        """Get all current arbitrage opportunities"""
+        # This would typically query recent predictions from database
+        # For now, return empty list
+        return []
+```
+
+---
+
+This completes Part 3 of the development guide. Part 4 will cover the export management features, document automation, and final integration between all systems.

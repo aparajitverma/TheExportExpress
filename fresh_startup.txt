@@ -1,0 +1,232 @@
+==========================================
+EXPORTEXPRESSPRO FRESH STARTUP GUIDE
+==========================================
+
+This guide will set up the complete ExportExpressPro system from scratch
+using the "TheExportExpress" database.
+
+==========================================
+STEP 1: STOP ALL SERVICES AND CLEAN UP
+==========================================
+
+# Stop all running services
+docker-compose down
+
+# Clear any cached data
+# (Optional) Clear browser localStorage for frontend
+
+==========================================
+STEP 2: START INFRASTRUCTURE SERVICES
+==========================================
+
+# Navigate to the main project directory
+cd C:\Users\welcome\Downloads\TheExportExpress-main
+
+# Start MongoDB and Redis using Docker Compose
+docker-compose up -d mongodb redis
+
+# Verify containers are running
+docker ps
+
+# Wait 10 seconds for MongoDB to fully start
+Start-Sleep -Seconds 10
+
+==========================================
+STEP 3: VERIFY MONGODB CONNECTION
+==========================================
+
+# Test MongoDB connection (PowerShell)
+$connectionString = "mongodb://admin:password@localhost:27017/TheExportExpress?authSource=admin"
+Write-Host "Testing MongoDB connection to TheExportExpress database..."
+
+# You can also test via MongoDB Compass or mongo shell:
+# mongodb://admin:password@localhost:27017/TheExportExpress?authSource=admin
+
+==========================================
+STEP 4: START BACKEND SERVER
+==========================================
+
+# Navigate to backend directory
+cd TheExportExpress-main\backend
+
+# Install dependencies (if not already installed)
+npm install
+
+# Seed the database with initial data
+npm run seed:all
+
+# Start the backend development server
+npm run dev
+
+# The backend will start on port 3000
+# You should see: "Server is running on http://127.0.0.1:3000"
+# And: "MongoDB connected successfully"
+
+==========================================
+STEP 5: VERIFY BACKEND IS WORKING
+==========================================
+
+# Test backend health (PowerShell)
+Invoke-RestMethod -Uri "http://localhost:3000/api/health"
+
+# Test login (PowerShell)
+Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method POST -ContentType "application/json" -Body '{"email":"admin@example.com","password":"Admin@123"}'
+
+# Test products endpoint
+Invoke-RestMethod -Uri "http://localhost:3000/api/products"
+
+==========================================
+STEP 6: START FRONTEND WEBSITE
+==========================================
+
+# Open a new terminal window
+# Navigate to frontend directory
+cd C:\Users\welcome\Downloads\TheExportExpress-main\TheExportExpress-main\frontend
+
+# Install dependencies (if not already installed)
+npm install
+
+# Start the frontend development server
+npm run dev
+
+# The frontend will start on http://localhost:5173
+
+==========================================
+STEP 7: START DESKTOP APPLICATION
+==========================================
+
+# Open a new terminal window
+# Navigate to desktop app directory
+cd C:\Users\welcome\Downloads\TheExportExpress-main\desktop-app
+
+# Install dependencies (if not already installed)
+npm install
+
+# Start the Tauri desktop application
+npm run tauri dev
+
+# The desktop app will open automatically
+
+==========================================
+STEP 8: VERIFY ALL SERVICES
+==========================================
+
+# Check if all services are running
+netstat -an | findstr :3000  # Backend
+netstat -an | findstr :5173  # Frontend
+netstat -an | findstr :1421  # Desktop App
+netstat -an | findstr :27017 # MongoDB
+
+# Test frontend connection
+# Visit: http://localhost:5173/test
+# Click "Test Login" button
+
+==========================================
+VERIFICATION COMMANDS
+==========================================
+
+# Test backend health
+Invoke-RestMethod -Uri "http://localhost:3000/api/health"
+
+# Test login with token verification
+$response = Invoke-RestMethod -Uri "http://localhost:3000/api/auth/login" -Method POST -ContentType "application/json" -Body '{"email":"admin@example.com","password":"Admin@123"}'
+$token = $response.data.token
+Invoke-RestMethod -Uri "http://localhost:3000/api/auth/me" -Headers @{"Authorization"="Bearer $token"}
+
+# Test products endpoint
+Invoke-RestMethod -Uri "http://localhost:3000/api/products"
+
+==========================================
+ACCESS URLs
+==========================================
+
+Frontend Website: http://localhost:5173
+Backend API: http://localhost:3000
+Desktop App: http://localhost:1421
+Test Page: http://localhost:5173/test
+Auth Cache Clearer: clear_auth_cache.html
+
+==========================================
+DEFAULT LOGIN CREDENTIALS
+==========================================
+
+Email: admin@example.com
+Password: Admin@123
+
+==========================================
+TROUBLESHOOTING FRESH START
+==========================================
+
+1. If MongoDB connection fails:
+   - Ensure Docker is running
+   - Run: docker-compose down && docker-compose up -d mongodb redis
+   - Wait 10 seconds for MongoDB to start
+
+2. If backend fails to start:
+   - Check MongoDB connection string in server.ts
+   - Ensure database name is "TheExportExpress"
+   - Check if port 3000 is available
+
+3. If seeding fails:
+   - Ensure MongoDB is fully started
+   - Check connection string
+   - Run: npm run seed:all again
+
+4. If frontend can't connect:
+   - Clear browser cache: localStorage.clear()
+   - Visit: http://localhost:5173/test
+   - Check browser console for errors
+
+5. If desktop app fails:
+   - Ensure Rust toolchain is installed
+   - Check if icon.ico exists in src-tauri/icons/
+
+==========================================
+QUICK FRESH START SCRIPT (POWERSHELL)
+==========================================
+
+# Copy and paste this complete script:
+
+Write-Host "Starting ExportExpressPro Fresh Setup..." -ForegroundColor Green
+
+# Stop existing services
+docker-compose down
+Write-Host "Stopped existing services" -ForegroundColor Yellow
+
+# Start infrastructure
+cd C:\Users\welcome\Downloads\TheExportExpress-main
+docker-compose up -d mongodb redis
+Write-Host "Started MongoDB and Redis" -ForegroundColor Yellow
+
+# Wait for MongoDB
+Start-Sleep -Seconds 10
+Write-Host "MongoDB should be ready" -ForegroundColor Yellow
+
+# Start backend
+cd TheExportExpress-main\backend
+npm run seed:all
+Write-Host "Database seeded" -ForegroundColor Yellow
+
+npm run dev
+Write-Host "Backend started" -ForegroundColor Green
+
+# In new terminal: Start frontend
+# cd C:\Users\welcome\Downloads\TheExportExpress-main\TheExportExpress-main\frontend
+# npm run dev
+
+# In new terminal: Start desktop app
+# cd C:\Users\welcome\Downloads\TheExportExpress-main\desktop-app
+# npm run tauri dev
+
+==========================================
+NOTES
+==========================================
+
+- Database name: TheExportExpress
+- All services must be running for full functionality
+- The backend automatically seeds the database on first run
+- Clear browser cache if you encounter authentication issues
+- Use the test page to verify connections
+- All passwords and secrets are hardcoded for development
+
+========================================== 

@@ -1,0 +1,1025 @@
+# ExportExpressPro - Development Guide Part 5: Deployment & Production
+
+---
+
+## PHASE 4: DEPLOYMENT & PRODUCTION SETUP (Month 7-8)
+
+### **4.1 Production Docker Setup**
+
+#### **Production Docker Compose (docker-compose.prod.yml):**
+```yaml
+version: '3.8'
+
+services:
+  # Database Services
+  mongodb:
+    image: mongo:7.0
+    container_name: exportpro_mongodb_prod
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: exportpro
+    volumes:
+      - mongodb_prod_data:/data/db
+      - ./backups:/backups
+      - ./init-mongo-prod.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - exportpro_network
+
+  redis:
+    image: redis:7.0-alpine
+    container_name: exportpro_redis_prod
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_prod_data:/data
+    networks:
+      - exportpro_network
+
+  # AI Engine Service
+  ai-engine:
+    build: 
+      context: ./ai-engine
+      dockerfile: Dockerfile.prod
+    container_name: exportpro_ai_prod
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URL=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/exportpro?authSource=admin
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - API_SECRET_KEY=${AI_API_SECRET_KEY}
+      - LOG_LEVEL=info
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ai_models_prod:/app/models
+      - ai_logs:/app/logs
+    networks:
+      - exportpro_network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+
+  # Website Integration Service
+  website-sync:
+    build:
+      context: ./website-integration
+      dockerfile: Dockerfile.prod
+    container_name: exportpro_sync_prod
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URL=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/exportpro?authSource=admin
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - AI_ENGINE_URL=http://ai-engine:8001
+      - JWT_SECRET=${JWT_SECRET}
+      - WEBSITE_URL=${WEBSITE_URL}
+    depends_on:
+      - mongodb
+      - redis
+      - ai-engine
+    volumes:
+      - sync_logs:/app/logs
+    networks:
+      - exportpro_network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: exportpro_nginx_prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/ssl/certs:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - website-sync
+      - ai-engine
+    networks:
+      - exportpro_network
+
+  # Monitoring and Logging
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: exportpro_prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - exportpro_network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: exportpro_grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - exportpro_network
+
+  # Backup Service
+  backup:
+    build: ./backup-service
+    container_name: exportpro_backup
+    restart: unless-stopped
+    environment:
+      - MONGODB_URL=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/exportpro?authSource=admin
+      - BACKUP_SCHEDULE=0 2 * * *  # Daily at 2 AM
+      - S3_BUCKET=${BACKUP_S3_BUCKET}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      - mongodb
+    networks:
+      - exportpro_network
+
+volumes:
+  mongodb_prod_data:
+  redis_prod_data:
+  ai_models_prod:
+  ai_logs:
+  sync_logs:
+  nginx_logs:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  exportpro_network:
+    driver: bridge
+```
+
+#### **Environment Configuration (.env.prod):**
+```bash
+# Database Configuration
+MONGO_ROOT_USER=exportpro_admin
+MONGO_ROOT_PASSWORD=your_secure_mongo_password
+REDIS_PASSWORD=your_secure_redis_password
+
+# Application Secrets
+JWT_SECRET=your_jwt_secret_key_minimum_32_characters
+AI_API_SECRET_KEY=your_ai_api_secret_key
+
+# External Services
+WEBSITE_URL=https://theexportexpress.com
+BACKUP_S3_BUCKET=exportpro-backups
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+
+# Monitoring
+GRAFANA_PASSWORD=your_grafana_password
+
+# SSL/TLS
+SSL_CERT_PATH=/etc/ssl/certs/exportpro.crt
+SSL_KEY_PATH=/etc/ssl/certs/exportpro.key
+```
+
+### **4.2 Desktop Application Build & Distribution**
+
+#### **Tauri Production Build (desktop-app/tauri.conf.json):**
+```json
+{
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist",
+    "withGlobalTauri": false
+  },
+  "package": {
+    "productName": "ExportExpressPro",
+    "version": "1.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": true
+      },
+      "http": {
+        "all": true,
+        "request": true,
+        "scope": [
+          "http://localhost:3001/**",
+          "http://localhost:8001/**",
+          "https://api.theexportexpress.com/**"
+        ]
+      },
+      "fs": {
+        "all": false,
+        "readFile": true,
+        "writeFile": true,
+        "readDir": true,
+        "copyFile": true,
+        "createDir": true,
+        "removeDir": true,
+        "removeFile": true,
+        "renameFile": true,
+        "exists": true,
+        "scope": [
+          "$APPDATA/ExportExpressPro/*",
+          "$DOWNLOAD/*",
+          "$DOCUMENT/*"
+        ]
+      },
+      "dialog": {
+        "all": false,
+        "open": true,
+        "save": true,
+        "message": true,
+        "ask": true,
+        "confirm": true
+      },
+      "notification": {
+        "all": true
+      },
+      "window": {
+        "all": false,
+        "close": true,
+        "hide": true,
+        "show": true,
+        "maximize": true,
+        "minimize": true,
+        "unmaximize": true,
+        "unminimize": true,
+        "startDragging": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "com.theexportexpress.exportexprespro",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "resources": [
+        "templates/*",
+        "config/*"
+      ],
+      "externalBin": [],
+      "copyright": "Copyright (c) 2024 TheExportExpress",
+      "category": "Business",
+      "shortDescription": "Complete export management with AI-powered market intelligence",
+      "longDescription": "ExportExpressPro is a comprehensive export management platform that combines order processing, supplier management, document automation, and AI-powered market intelligence to optimize your export business operations.",
+      "windows": {
+        "certificateThumbprint": null,
+        "digestAlgorithm": "sha256",
+        "timestampUrl": "",
+        "tsp": false,
+        "wix": {
+          "language": ["en-US"],
+          "template": "installer_template.wxs"
+        },
+        "nsis": {
+          "installerIcon": "icons/icon.ico",
+          "uninstallerIcon": "icons/icon.ico",
+          "license": "LICENSE.txt",
+          "headerImage": "installer_header.bmp",
+          "sidebarImage": "installer_sidebar.bmp"
+        }
+      },
+      "macOS": {
+        "frameworks": [],
+        "minimumSystemVersion": "10.13",
+        "exceptionDomain": "",
+        "signingIdentity": null,
+        "providerShortName": null,
+        "entitlements": null
+      },
+      "deb": {
+        "depends": ["libwebkit2gtk-4.0-37", "libgtk-3-0"],
+        "files": {
+          "/usr/share/applications/exportexprespro.desktop": "exportexprespro.desktop"
+        }
+      }
+    },
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' http://localhost:3001 http://localhost:8001 https://api.theexportexpress.com ws://localhost:3001 wss://api.theexportexpress.com; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'"
+    },
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://releases.theexportexpress.com/exportexprespro/{{target}}/{{current_version}}"
+      ],
+      "dialog": true,
+      "pubkey": "your_public_key_for_update_verification"
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "resizable": true,
+        "title": "ExportExpressPro",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1200,
+        "minHeight": 700,
+        "center": true,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "theme": "light"
+      }
+    ]
+  }
+}
+```
+
+#### **Build Scripts (desktop-app/package.json):**
+```json
+{
+  "name": "exportexprespro-desktop",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:build:windows": "tauri build --target x86_64-pc-windows-msvc",
+    "tauri:build:macos": "tauri build --target x86_64-apple-darwin",
+    "tauri:build:linux": "tauri build --target x86_64-unknown-linux-gnu",
+    "release": "npm run build && npm run tauri:build",
+    "test": "jest",
+    "test:e2e": "playwright test",
+    "lint": "eslint src --ext .ts,.tsx",
+    "format": "prettier --write src"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^1.5.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.8.0",
+    "@tanstack/react-query": "^4.24.0",
+    "zustand": "^4.3.0",
+    "socket.io-client": "^4.6.0",
+    "react-hot-toast": "^2.4.0",
+    "axios": "^1.3.0",
+    "date-fns": "^2.29.0",
+    "@heroicons/react": "^2.0.0",
+    "tailwindcss": "^3.2.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^1.5.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "@vitejs/plugin-react": "^3.1.0",
+    "typescript": "^4.9.0",
+    "vite": "^4.1.0",
+    "jest": "^29.0.0",
+    "playwright": "^1.30.0",
+    "eslint": "^8.0.0",
+    "prettier": "^2.8.0"
+  }
+}
+```
+
+### **4.3 CI/CD Pipeline Setup**
+
+#### **GitHub Actions Workflow (.github/workflows/build-and-deploy.yml):**
+```yaml
+name: Build and Deploy ExportExpressPro
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Test Jobs
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        
+    - name: Run Rust tests
+      run: |
+        cd desktop-app/src-tauri
+        cargo test --verbose
+
+  test-ai-engine:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        cd ai-engine
+        pip install -r requirements.txt
+        pip install pytest
+        
+    - name: Run Python tests
+      run: |
+        cd ai-engine
+        pytest tests/ -v
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      run: |
+        cd desktop-app
+        npm ci
+        
+    - name: Run tests
+      run: |
+        cd desktop-app
+        npm test
+        
+    - name: Run E2E tests
+      run: |
+        cd desktop-app
+        npm run test:e2e
+
+  # Build Desktop Application
+  build-desktop:
+    needs: [test-backend, test-frontend]
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.platform }}
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        
+    - name: Install system dependencies (Ubuntu)
+      if: matrix.platform == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+        
+    - name: Install frontend dependencies
+      run: |
+        cd desktop-app
+        npm ci
+        
+    - name: Build application
+      run: |
+        cd desktop-app
+        npm run tauri:build
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: desktop-app-${{ matrix.platform }}
+        path: desktop-app/src-tauri/target/release/bundle/
+
+  # Build and Deploy Services
+  build-and-deploy-services:
+    needs: [test-ai-engine]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      
+    - name: Login to Docker Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Build and push AI Engine
+      uses: docker/build-push-action@v4
+      with:
+        context: ./ai-engine
+        file: ./ai-engine/Dockerfile.prod
+        push: true
+        tags: ghcr.io/${{ github.repository }}/ai-engine:latest
+        
+    - name: Build and push Website Sync
+      uses: docker/build-push-action@v4
+      with:
+        context: ./website-integration
+        file: ./website-integration/Dockerfile.prod
+        push: true
+        tags: ghcr.io/${{ github.repository }}/website-sync:latest
+
+  # Deploy to Production
+  deploy-production:
+    needs: [build-desktop, build-and-deploy-services]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Deploy to Production Server
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USER }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          cd /opt/exportexprespro
+          docker-compose -f docker-compose.prod.yml pull
+          docker-compose -f docker-compose.prod.yml up -d
+          docker system prune -f
+          
+    - name: Update Desktop App Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          desktop-app/src-tauri/target/release/bundle/**/*
+        generate_release_notes: true
+```
+
+### **4.4 Monitoring & Logging Setup**
+
+#### **Prometheus Configuration (monitoring/prometheus.yml):**
+```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'ai-engine'
+    static_configs:
+      - targets: ['ai-engine:8001']
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  - job_name: 'website-sync'
+    static_configs:
+      - targets: ['website-sync:3001']
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  - job_name: 'mongodb'
+    static_configs:
+      - targets: ['mongodb:27017']
+    scrape_interval: 60s
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 60s
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+```
+
+#### **Grafana Dashboard Configuration:**
+```json
+{
+  "dashboard": {
+    "id": null,
+    "title": "ExportExpressPro System Overview",
+    "tags": ["exportpro", "monitoring"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "System Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=~\"ai-engine|website-sync\"}",
+            "legendFormat": "{{ job }}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "API Response Times",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Database Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(mongodb_op_counters_total[5m])",
+            "legendFormat": "{{ type }}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "AI Engine Predictions",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(ai_predictions_total[1h])",
+            "legendFormat": "Predictions/hour"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 5,
+        "title": "Active Orders",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "orders_active_total",
+            "legendFormat": "Active Orders"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}
+```
+
+### **4.5 Backup & Recovery Strategy**
+
+#### **Automated Backup Service (backup-service/backup.py):**
+```python
+#!/usr/bin/env python3
+import os
+import subprocess
+import datetime
+import boto3
+import logging
+from pathlib import Path
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class BackupService:
+    def __init__(self):
+        self.mongodb_url = os.getenv('MONGODB_URL')
+        self.backup_dir = Path('/backups')
+        self.s3_bucket = os.getenv('S3_BUCKET')
+        self.s3_client = boto3.client('s3')
+        
+    def create_mongodb_backup(self):
+        """Create MongoDB backup using mongodump"""
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_path = self.backup_dir / f'mongodb_backup_{timestamp}'
+        
+        try:
+            logger.info(f"Starting MongoDB backup to {backup_path}")
+            
+            cmd = [
+                'mongodump',
+                '--uri', self.mongodb_url,
+                '--out', str(backup_path)
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                logger.info("MongoDB backup completed successfully")
+                return backup_path
+            else:
+                logger.error(f"MongoDB backup failed: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"MongoDB backup error: {str(e)}")
+            return None
+    
+    def compress_backup(self, backup_path):
+        """Compress backup directory"""
+        try:
+            compressed_file = f"{backup_path}.tar.gz"
+            
+            cmd = ['tar', '-czf', compressed_file, '-C', str(backup_path.parent), backup_path.name]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                logger.info(f"Backup compressed to {compressed_file}")
+                # Remove uncompressed backup
+                subprocess.run(['rm', '-rf', str(backup_path)])
+                return compressed_file
+            else:
+                logger.error(f"Compression failed: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Compression error: {str(e)}")
+            return None
+    
+    def upload_to_s3(self, file_path):
+        """Upload backup to S3"""
+        try:
+            file_name = Path(file_path).name
+            s3_key = f"mongodb_backups/{file_name}"
+            
+            logger.info(f"Uploading {file_name} to S3")
+            
+            self.s3_client.upload_file(file_path, self.s3_bucket, s3_key)
+            logger.info(f"Upload to S3 completed: s3://{self.s3_bucket}/{s3_key}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"S3 upload error: {str(e)}")
+            return False
+    
+    def cleanup_old_backups(self, keep_days=30):
+        """Remove local backups older than keep_days"""
+        try:
+            cutoff_date = datetime.datetime.now() - datetime.timedelta(days=keep_days)
+            
+            for backup_file in self.backup_dir.glob('mongodb_backup_*.tar.gz'):
+                file_stat = backup_file.stat()
+                file_date = datetime.datetime.fromtimestamp(file_stat.st_mtime)
+                
+                if file_date < cutoff_date:
+                    backup_file.unlink()
+                    logger.info(f"Removed old backup: {backup_file.name}")
+                    
+        except Exception as e:
+            logger.error(f"Cleanup error: {str(e)}")
+    
+    def run_backup(self):
+        """Run complete backup process"""
+        logger.info("Starting backup process")
+        
+        # Create MongoDB backup
+        backup_path = self.create_mongodb_backup()
+        if not backup_path:
+            return False
+        
+        # Compress backup
+        compressed_file = self.compress_backup(backup_path)
+        if not compressed_file:
+            return False
+        
+        # Upload to S3
+        upload_success = self.upload_to_s3(compressed_file)
+        
+        # Cleanup old backups
+        self.cleanup_old_backups()
+        
+        logger.info("Backup process completed")
+        return upload_success
+
+if __name__ == "__main__":
+    backup_service = BackupService()
+    success = backup_service.run_backup()
+    
+    if not success:
+        exit(1)
+```
+
+### **4.6 Production Security Checklist**
+
+#### **Security Configuration:**
+```yaml
+# security-checklist.yml
+database_security:
+  - enable_authentication: true
+  - use_encrypted_connections: true
+  - regular_password_rotation: true
+  - limit_database_access: true
+  - enable_audit_logging: true
+
+application_security:
+  - jwt_token_expiry: 24h
+  - secure_session_management: true
+  - input_validation: comprehensive
+  - sql_injection_protection: true
+  - xss_protection: true
+  - csrf_protection: true
+  - rate_limiting: enabled
+
+network_security:
+  - firewall_configured: true
+  - ssl_certificates: valid
+  - secure_communication: https_only
+  - api_authentication: required
+  - cors_policy: restrictive
+
+infrastructure_security:
+  - regular_updates: automated
+  - vulnerability_scanning: weekly
+  - access_logging: comprehensive
+  - backup_encryption: enabled
+  - disaster_recovery_plan: tested
+```
+
+### **4.7 Performance Optimization**
+
+#### **Database Optimization:**
+```javascript
+// MongoDB optimization queries
+// Create compound indexes for common queries
+db.products.createIndex({ 
+  "category": 1, 
+  "pricing.current_price": 1, 
+  "inventory.available": 1 
+});
+
+db.orders.createIndex({ 
+  "status_tracking.current_status": 1, 
+  "created_at": -1 
+});
+
+db.market_intelligence.createIndex({ 
+  "product_id": 1, 
+  "timestamp": -1 
+}, { 
+  expireAfterSeconds: 2592000  // 30 days
+});
+
+// Aggregation pipeline optimization
+db.products.aggregate([
+  { $match: { "inventory.available": { $gt: 0 } } },
+  { $lookup: {
+      from: "market_intelligence",
+      localField: "_id",
+      foreignField: "product_id",
+      as: "predictions"
+  }},
+  { $addFields: {
+      latest_prediction: { $arrayElemAt: ["$predictions", 0] }
+  }},
+  { $project: {
+      name: 1,
+      category: 1,
+      "pricing.current_price": 1,
+      "latest_prediction.predictions.price_3_days.value": 1
+  }}
+]);
+```
+
+### **4.8 User Documentation & Training**
+
+#### **Installation Guide (README_Installation.md):**
+```markdown
+# ExportExpressPro Installation Guide
+
+## System Requirements
+
+### Desktop Application
+- **Windows**: Windows 10 or later (64-bit)
+- **macOS**: macOS 10.13 or later
+- **Linux**: Ubuntu 18.04 LTS or equivalent
+- **RAM**: Minimum 4GB, Recommended 8GB
+- **Storage**: 2GB free space
+- **Network**: Internet connection required
+
+### Server Requirements (for services)
+- **CPU**: 4+ cores
+- **RAM**: 8GB minimum, 16GB recommended
+- **Storage**: 100GB SSD
+- **Network**: Static IP address recommended
+
+## Installation Steps
+
+### 1. Desktop Application Installation
+
+#### Windows
+1. Download `ExportExpressPro_1.0.0_x64_en-US.msi`
+2. Right-click and select "Run as administrator"
+3. Follow the installation wizard
+4. Launch from Start Menu or Desktop shortcut
+
+#### macOS
+1. Download `ExportExpressPro_1.0.0_x64.dmg`
+2. Open the DMG file
+3. Drag ExportExpressPro to Applications folder
+4. Launch from Applications or Spotlight
+
+#### Linux
+1. Download `export-express-pro_1.0.0_amd64.AppImage`
+2. Make executable: `chmod +x export-express-pro_1.0.0_amd64.AppImage`
+3. Run: `./export-express-pro_1.0.0_amd64.AppImage`
+
+### 2. First-Time Setup
+
+1. **Server Connection**
+   - Open ExportExpressPro
+   - Go to Settings → Server Configuration
+   - Enter your server details or use local mode
+
+2. **Data Import**
+   - Go to Settings → Data Import
+   - Import your existing supplier data (CSV format)
+   - Import product catalog
+   - Import customer database
+
+3. **AI Configuration**
+   - Settings → AI Engine
+   - Verify AI service connection
+   - Configure prediction preferences
+   - Set up alert thresholds
+
+## Troubleshooting
+
+### Common Issues
+
+**Connection Failed**
+- Check internet connectivity
+- Verify server URL in settings
+- Check firewall/antivirus blocking
+
+**Slow Performance**
+- Close unnecessary applications
+- Check available RAM
+- Verify disk space
+
+**Import Errors**
+- Verify CSV file format
+- Check for special characters
+- Ensure UTF-8 encoding
+
+### Support Contacts
+- Technical Support: support@theexportexpress.com
+- Documentation: https://docs.theexportexpress.com
+- Video Tutorials: https://tutorials.theexportexpress.com
+```
+
+This completes the comprehensive ExportExpressPro Development Guide. The five-part guide covers everything from initial architecture to production deployment, providing a complete roadmap for building the integrated export management and AI prediction platform.

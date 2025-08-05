@@ -1,0 +1,997 @@
+# ExportExpressPro - Development Guide Part 4: Export Management & Integration
+
+---
+
+## PHASE 3: EXPORT MANAGEMENT CORE (Months 5-6)
+
+### **3.1 Order Processing System**
+
+#### **Order Manager (desktop-app/src-tauri/src/export_manager/order_manager.rs):**
+```rust
+use serde::{Deserialize, Serialize};
+use mongodb::bson::{doc, oid::ObjectId};
+use std::collections::HashMap;
+use chrono::{DateTime, Utc};
+use uuid::Uuid;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Order {
+    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+    pub id: Option<ObjectId>,
+    pub order_number: String,
+    pub client: ClientInfo,
+    pub products: Vec<OrderProduct>,
+    pub order_details: OrderDetails,
+    pub ai_analysis: Option<AIAnalysis>,
+    pub status_tracking: StatusTracking,
+    pub documents: DocumentStatus,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ClientInfo {
+    pub client_id: String,
+    pub company_name: String,
+    pub contact_person: String,
+    pub email: String,
+    pub phone: Option<String>,
+    pub shipping_address: Address,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OrderProduct {
+    pub product_id: String,
+    pub product_name: String,
+    pub quantity: f64,
+    pub unit: String,
+    pub unit_price: f64,
+    pub total: f64,
+    pub specifications: HashMap<String, String>,
+    pub predicted_profit_margin: Option<f64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OrderDetails {
+    pub total_value: f64,
+    pub currency: String,
+    pub payment_terms: String,
+    pub delivery_terms: String,
+    pub delivery_date: Option<DateTime<Utc>>,
+    pub special_instructions: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AIAnalysis {
+    pub predicted_total_profit: f64,
+    pub profit_margin: f64,
+    pub risk_score: f64,
+    pub confidence: f64,
+    pub optimal_shipping_method: String,
+    pub recommended_insurance: f64,
+    pub market_conditions: String,
+    pub recommendations: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StatusTracking {
+    pub current_status: OrderStatus,
+    pub status_history: Vec<StatusUpdate>,
+    pub estimated_completion: Option<DateTime<Utc>>,
+    pub actual_completion: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum OrderStatus {
+    Created,
+    AIAnalyzing,
+    SourceSelection,
+    Negotiating,
+    Confirmed,
+    Sourcing,
+    QualityCheck,
+    Documentation,
+    Shipping,
+    InTransit,
+    CustomsClearance,
+    Delivered,
+    Completed,
+    Cancelled,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StatusUpdate {
+    pub status: OrderStatus,
+    pub timestamp: DateTime<Utc>,
+    pub notes: Option<String>,
+    pub updated_by: String,
+    pub automated: bool,
+}
+
+pub struct OrderManager {
+    db: Arc<Database>,
+    ai_client: Arc<AIClient>,
+    websocket: Arc<WebSocketManager>,
+}
+
+impl OrderManager {
+    pub fn new(db: Arc<Database>, ai_client: Arc<AIClient>) -> Self {
+        Self {
+            db,
+            ai_client,
+            websocket: Arc::new(WebSocketManager::new()),
+        }
+    }
+
+    pub async fn create_order(&mut self, order_data: serde_json::Value) -> Result<String, Box<dyn std::error::Error>> {
+        // Parse order data
+        let mut order: Order = serde_json::from_value(order_data)?;
+        
+        // Generate order number
+        order.order_number = self.generate_order_number().await?;
+        order.created_at = Utc::now();
+        order.updated_at = Utc::now();
+        
+        // Set initial status
+        order.status_tracking = StatusTracking {
+            current_status: OrderStatus::Created,
+            status_history: vec![StatusUpdate {
+                status: OrderStatus::Created,
+                timestamp: Utc::now(),
+                notes: Some("Order created".to_string()),
+                updated_by: "system".to_string(),
+                automated: true,
+            }],
+            estimated_completion: None,
+            actual_completion: None,
+        };
+
+        // Store order in database
+        let order_id = self.db.create_order(serde_json::to_value(&order)?).await?;
+        
+        // Start AI analysis in background
+        self.start_ai_analysis(order_id.clone()).await?;
+        
+        // Send real-time notification
+        self.websocket.broadcast(serde_json::json!({
+            "type": "order_created",
+            "order_id": order_id,
+            "order_number": order.order_number,
+            "client": order.client.company_name,
+            "total_value": order.order_details.total_value
+        })).await?;
+        
+        Ok(order_id)
+    }
+
+    async fn start_ai_analysis(&self, order_id: String) -> Result<(), Box<dyn std::error::Error>> {
+        // Update status to analyzing
+        self.update_order_status(
+            &order_id,
+            OrderStatus::AIAnalyzing,
+            Some("Starting AI analysis".to_string()),
+            true
+        ).await?;
+
+        // Get order details
+        let order = self.db.get_order(&order_id).await?;
+        
+        // Request AI analysis for each product
+        let mut ai_analyses = Vec::new();
+        
+        for product in &order.products {
+            let analysis = self.ai_client.analyze_order_product(
+                &product.product_id,
+                product.quantity,
+                product.unit_price,
+                &order.order_details.delivery_terms
+            ).await?;
+            
+            ai_analyses.push(analysis);
+        }
+        
+        // Combine analyses
+        let combined_analysis = self.combine_ai_analyses(ai_analyses)?;
+        
+        // Update order with AI analysis
+        self.db.update_order_ai_analysis(&order_id, &combined_analysis).await?;
+        
+        // Update status to source selection
+        self.update_order_status(
+            &order_id,
+            OrderStatus::SourceSelection,
+            Some("AI analysis complete, selecting optimal sources".to_string()),
+            true
+        ).await?;
+        
+        // Send analysis results via WebSocket
+        self.websocket.broadcast(serde_json::json!({
+            "type": "ai_analysis_complete",
+            "order_id": order_id,
+            "analysis": combined_analysis,
+            "recommendations": combined_analysis.recommendations
+        })).await?;
+        
+        Ok(())
+    }
+
+    fn combine_ai_analyses(&self, analyses: Vec<AIAnalysis>) -> Result<AIAnalysis, Box<dyn std::error::Error>> {
+        if analyses.is_empty() {
+            return Err("No AI analyses to combine".into());
+        }
+
+        let total_profit: f64 = analyses.iter().map(|a| a.predicted_total_profit).sum();
+        let avg_confidence: f64 = analyses.iter().map(|a| a.confidence).sum() / analyses.len() as f64;
+        let avg_risk: f64 = analyses.iter().map(|a| a.risk_score).sum() / analyses.len() as f64;
+        
+        // Calculate weighted profit margin
+        let total_value: f64 = analyses.iter().map(|a| a.predicted_total_profit / a.profit_margin).sum();
+        let profit_margin = if total_value > 0.0 { total_profit / total_value } else { 0.0 };
+
+        // Combine recommendations
+        let mut recommendations = Vec::new();
+        for analysis in &analyses {
+            recommendations.extend(analysis.recommendations.clone());
+        }
+        recommendations.dedup();
+
+        // Determine optimal shipping method
+        let shipping_methods: HashMap<String, usize> = analyses.iter()
+            .fold(HashMap::new(), |mut acc, analysis| {
+                *acc.entry(analysis.optimal_shipping_method.clone()).or_insert(0) += 1;
+                acc
+            });
+        
+        let optimal_shipping = shipping_methods.iter()
+            .max_by_key(|(_, count)| *count)
+            .map(|(method, _)| method.clone())
+            .unwrap_or_else(|| "air_freight".to_string());
+
+        Ok(AIAnalysis {
+            predicted_total_profit: total_profit,
+            profit_margin,
+            risk_score: avg_risk,
+            confidence: avg_confidence,
+            optimal_shipping_method: optimal_shipping,
+            recommended_insurance: total_value * 1.1, // 110% of order value
+            market_conditions: "analyzed".to_string(),
+            recommendations,
+        })
+    }
+
+    pub async fn update_order_status(
+        &self,
+        order_id: &str,
+        status: OrderStatus,
+        notes: Option<String>,
+        automated: bool
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let status_update = StatusUpdate {
+            status: status.clone(),
+            timestamp: Utc::now(),
+            notes,
+            updated_by: if automated { "system".to_string() } else { "user".to_string() },
+            automated,
+        };
+
+        self.db.add_order_status_update(order_id, &status_update).await?;
+
+        // Send real-time update
+        self.websocket.broadcast(serde_json::json!({
+            "type": "order_status_update",
+            "order_id": order_id,
+            "new_status": status,
+            "timestamp": status_update.timestamp,
+            "notes": status_update.notes
+        })).await?;
+
+        Ok(())
+    }
+
+    async fn generate_order_number(&self) -> Result<String, Box<dyn std::error::Error>> {
+        let year = Utc::now().year();
+        let month = Utc::now().month();
+        
+        // Get count of orders this month
+        let count = self.db.get_orders_count_this_month().await?;
+        
+        Ok(format!("EXP-{}{:02}-{:04}", year, month, count + 1))
+    }
+
+    pub async fn get_orders(&self, filters: OrderFilters) -> Result<Vec<Order>, Box<dyn std::error::Error>> {
+        self.db.get_orders_with_filters(filters).await
+    }
+
+    pub async fn get_order_by_id(&self, order_id: &str) -> Result<Option<Order>, Box<dyn std::error::Error>> {
+        self.db.get_order(order_id).await
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OrderFilters {
+    pub status: Option<OrderStatus>,
+    pub client_id: Option<String>,
+    pub date_range: Option<(DateTime<Utc>, DateTime<Utc>)>,
+    pub min_value: Option<f64>,
+    pub max_value: Option<f64>,
+}
+```
+
+### **3.2 Supplier Management System**
+
+#### **Supplier Manager (desktop-app/src-tauri/src/export_manager/supplier_manager.rs):**
+```rust
+use serde::{Deserialize, Serialize};
+use mongodb::bson::{doc, oid::ObjectId};
+use std::collections::HashMap;
+use chrono::{DateTime, Utc};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Supplier {
+    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+    pub id: Option<ObjectId>,
+    pub name: String,
+    pub supplier_type: SupplierType,
+    pub location: Location,
+    pub contact: ContactInfo,
+    pub products_offered: Vec<ProductOffering>,
+    pub performance_metrics: PerformanceMetrics,
+    pub financial_terms: FinancialTerms,
+    pub certifications: Vec<String>,
+    pub ai_recommendations: AISupplierRecommendations,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub is_active: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum SupplierType {
+    Farmer,
+    FarmerCooperative,
+    Wholesaler,
+    Manufacturer,
+    Trader,
+    Processor,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Location {
+    pub state: String,
+    pub district: String,
+    pub city: String,
+    pub pincode: String,
+    pub coordinates: Option<(f64, f64)>,
+    pub accessibility: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ContactInfo {
+    pub primary_contact: String,
+    pub phone: String,
+    pub email: Option<String>,
+    pub whatsapp: Option<String>,
+    pub preferred_communication: String,
+    pub languages: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ProductOffering {
+    pub product_id: String,
+    pub product_name: String,
+    pub capacity_per_month: f64,
+    pub unit: String,
+    pub current_price: f64,
+    pub quality_grade: String,
+    pub lead_time_days: u32,
+    pub minimum_order: f64,
+    pub seasonal_availability: Vec<String>,
+    pub certifications: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PerformanceMetrics {
+    pub reliability_score: f64,
+    pub quality_consistency: f64,
+    pub delivery_timeliness: f64,
+    pub price_competitiveness: f64,
+    pub communication_responsiveness: f64,
+    pub total_orders_completed: u32,
+    pub successful_deliveries: u32,
+    pub average_rating: f64,
+    pub last_updated: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FinancialTerms {
+    pub payment_terms: String,
+    pub credit_limit: Option<f64>,
+    pub discount_for_bulk: f64,
+    pub advance_payment_discount: f64,
+    pub preferred_payment_method: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AISupplierRecommendations {
+    pub preferred_for_products: Vec<String>,
+    pub best_seasons: Vec<String>,
+    pub negotiation_tips: Vec<String>,
+    pub risk_factors: Vec<String>,
+    pub optimization_suggestions: Vec<String>,
+}
+
+pub struct SupplierManager {
+    db: Arc<Database>,
+    ai_client: Arc<AIClient>,
+}
+
+impl SupplierManager {
+    pub fn new(db: Arc<Database>, ai_client: Arc<AIClient>) -> Self {
+        Self { db, ai_client }
+    }
+
+    pub async fn add_supplier(&self, supplier_data: serde_json::Value) -> Result<String, Box<dyn std::error::Error>> {
+        let mut supplier: Supplier = serde_json::from_value(supplier_data)?;
+        
+        // Set timestamps
+        supplier.created_at = Utc::now();
+        supplier.updated_at = Utc::now();
+        supplier.is_active = true;
+
+        // Initialize performance metrics
+        supplier.performance_metrics = PerformanceMetrics {
+            reliability_score: 5.0,
+            quality_consistency: 5.0,
+            delivery_timeliness: 5.0,
+            price_competitiveness: 5.0,
+            communication_responsiveness: 5.0,
+            total_orders_completed: 0,
+            successful_deliveries: 0,
+            average_rating: 5.0,
+            last_updated: Utc::now(),
+        };
+
+        // Generate AI recommendations
+        supplier.ai_recommendations = self.generate_ai_recommendations(&supplier).await?;
+
+        // Store in database
+        let supplier_id = self.db.create_supplier(serde_json::to_value(&supplier)?).await?;
+        
+        Ok(supplier_id)
+    }
+
+    async fn generate_ai_recommendations(&self, supplier: &Supplier) -> Result<AISupplierRecommendations, Box<dyn std::error::Error>> {
+        // Analyze supplier data with AI
+        let analysis = self.ai_client.analyze_supplier(supplier).await?;
+        
+        Ok(AISupplierRecommendations {
+            preferred_for_products: analysis.preferred_products.unwrap_or_default(),
+            best_seasons: analysis.optimal_seasons.unwrap_or_default(),
+            negotiation_tips: analysis.negotiation_strategies.unwrap_or_default(),
+            risk_factors: analysis.identified_risks.unwrap_or_default(),
+            optimization_suggestions: analysis.improvement_suggestions.unwrap_or_default(),
+        })
+    }
+
+    pub async fn find_best_suppliers_for_product(
+        &self,
+        product_id: &str,
+        quantity: f64,
+        required_by: DateTime<Utc>
+    ) -> Result<Vec<SupplierRecommendation>, Box<dyn std::error::Error>> {
+        // Get all suppliers offering this product
+        let suppliers = self.db.get_suppliers_for_product(product_id).await?;
+        
+        let mut recommendations = Vec::new();
+
+        for supplier in suppliers {
+            // Check if supplier can fulfill the order
+            if let Some(offering) = supplier.products_offered.iter()
+                .find(|p| p.product_id == product_id) {
+                
+                if offering.minimum_order <= quantity {
+                    let recommendation = self.evaluate_supplier_for_order(
+                        &supplier,
+                        offering,
+                        quantity,
+                        required_by
+                    ).await?;
+                    
+                    recommendations.push(recommendation);
+                }
+            }
+        }
+
+        // Sort by overall score
+        recommendations.sort_by(|a, b| b.overall_score.partial_cmp(&a.overall_score).unwrap());
+
+        Ok(recommendations)
+    }
+
+    async fn evaluate_supplier_for_order(
+        &self,
+        supplier: &Supplier,
+        offering: &ProductOffering,
+        quantity: f64,
+        required_by: DateTime<Utc>
+    ) -> Result<SupplierRecommendation, Box<dyn std::error::Error>> {
+        let performance = &supplier.performance_metrics;
+        
+        // Calculate delivery feasibility
+        let lead_time = offering.lead_time_days as i64;
+        let delivery_date = Utc::now() + chrono::Duration::days(lead_time);
+        let can_deliver_on_time = delivery_date <= required_by;
+
+        // Calculate capacity utilization
+        let capacity_utilization = quantity / offering.capacity_per_month;
+
+        // Calculate scores
+        let reliability_score = performance.reliability_score / 10.0;
+        let quality_score = performance.quality_consistency / 10.0;
+        let timeliness_score = if can_deliver_on_time { 
+            performance.delivery_timeliness / 10.0 
+        } else { 
+            0.0 
+        };
+        let price_score = self.calculate_price_competitiveness_score(offering.current_price, product_id).await?;
+
+        // Overall weighted score
+        let overall_score = (reliability_score * 0.3) + 
+                           (quality_score * 0.25) + 
+                           (timeliness_score * 0.25) + 
+                           (price_score * 0.2);
+
+        Ok(SupplierRecommendation {
+            supplier_id: supplier.id.as_ref().unwrap().to_string(),
+            supplier_name: supplier.name.clone(),
+            offering: offering.clone(),
+            overall_score,
+            reliability_score,
+            quality_score,
+            timeliness_score,
+            price_score,
+            can_deliver_on_time,
+            capacity_utilization,
+            estimated_delivery_date: delivery_date,
+            total_cost: offering.current_price * quantity,
+            risk_factors: supplier.ai_recommendations.risk_factors.clone(),
+            recommendations: supplier.ai_recommendations.negotiation_tips.clone(),
+        })
+    }
+
+    async fn calculate_price_competitiveness_score(&self, price: f64, product_id: &str) -> Result<f64, Box<dyn std::error::Error>> {
+        // Get market average price for this product
+        let market_avg = self.db.get_average_market_price(product_id).await?;
+        
+        if market_avg > 0.0 {
+            let price_ratio = market_avg / price;
+            // Score increases as price decreases relative to market average
+            Ok((price_ratio - 0.8).max(0.0).min(1.0))
+        } else {
+            Ok(0.5) // Default score if no market data
+        }
+    }
+
+    pub async fn update_supplier_performance(
+        &self,
+        supplier_id: &str,
+        order_id: &str,
+        performance_update: PerformanceUpdate
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut supplier = self.db.get_supplier(supplier_id).await?
+            .ok_or("Supplier not found")?;
+
+        // Update performance metrics based on the completed order
+        let metrics = &mut supplier.performance_metrics;
+        
+        // Update counters
+        metrics.total_orders_completed += 1;
+        if performance_update.successful {
+            metrics.successful_deliveries += 1;
+        }
+
+        // Update scores with weighted average (new data has 20% weight)
+        let weight = 0.2;
+        metrics.reliability_score = metrics.reliability_score * (1.0 - weight) + 
+                                   performance_update.reliability_rating * weight;
+        metrics.quality_consistency = metrics.quality_consistency * (1.0 - weight) + 
+                                     performance_update.quality_rating * weight;
+        metrics.delivery_timeliness = metrics.delivery_timeliness * (1.0 - weight) + 
+                                     performance_update.timeliness_rating * weight;
+        
+        // Recalculate average rating
+        metrics.average_rating = (metrics.reliability_score + metrics.quality_consistency + 
+                                 metrics.delivery_timeliness) / 3.0;
+        
+        metrics.last_updated = Utc::now();
+        supplier.updated_at = Utc::now();
+
+        // Update AI recommendations based on new performance data
+        supplier.ai_recommendations = self.generate_ai_recommendations(&supplier).await?;
+
+        // Save updated supplier
+        self.db.update_supplier(supplier_id, serde_json::to_value(&supplier)?).await?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SupplierRecommendation {
+    pub supplier_id: String,
+    pub supplier_name: String,
+    pub offering: ProductOffering,
+    pub overall_score: f64,
+    pub reliability_score: f64,
+    pub quality_score: f64,
+    pub timeliness_score: f64,
+    pub price_score: f64,
+    pub can_deliver_on_time: bool,
+    pub capacity_utilization: f64,
+    pub estimated_delivery_date: DateTime<Utc>,
+    pub total_cost: f64,
+    pub risk_factors: Vec<String>,
+    pub recommendations: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PerformanceUpdate {
+    pub successful: bool,
+    pub reliability_rating: f64,
+    pub quality_rating: f64,
+    pub timeliness_rating: f64,
+    pub notes: Option<String>,
+}
+```
+
+### **3.3 Document Automation System**
+
+#### **Document Generator (desktop-app/src-tauri/src/export_manager/document_generator.rs):**
+```rust
+use serde::{Deserialize, Serialize};
+use handlebars::Handlebars;
+use std::collections::HashMap;
+use chrono::{DateTime, Utc};
+use uuid::Uuid;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DocumentGenerator {
+    handlebars: Handlebars<'static>,
+    templates_path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum DocumentType {
+    CommercialInvoice,
+    PackingList,
+    CertificateOfOrigin,
+    PhytosanitaryCertificate,
+    HealthCertificate,
+    InsuranceCertificate,
+    BillOfLading,
+    CustomsDeclaration,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DocumentTemplate {
+    pub doc_type: DocumentType,
+    pub template_path: String,
+    pub output_format: String, // "pdf", "docx", "html"
+    pub required_fields: Vec<String>,
+}
+
+impl DocumentGenerator {
+    pub fn new(templates_path: String) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut handlebars = Handlebars::new();
+        
+        // Register templates
+        handlebars.register_template_file("commercial_invoice", 
+            format!("{}/commercial_invoice.hbs", templates_path))?;
+        handlebars.register_template_file("packing_list", 
+            format!("{}/packing_list.hbs", templates_path))?;
+        handlebars.register_template_file("certificate_of_origin", 
+            format!("{}/certificate_of_origin.hbs", templates_path))?;
+        
+        // Register helpers
+        handlebars.register_helper("format_currency", Box::new(format_currency_helper));
+        handlebars.register_helper("format_date", Box::new(format_date_helper));
+        handlebars.register_helper("upper", Box::new(upper_helper));
+
+        Ok(Self {
+            handlebars,
+            templates_path,
+        })
+    }
+
+    pub async fn generate_commercial_invoice(
+        &self,
+        order: &Order,
+        exporter_details: &ExporterDetails
+    ) -> Result<GeneratedDocument, Box<dyn std::error::Error>> {
+        let context = self.prepare_invoice_context(order, exporter_details)?;
+        
+        let html_content = self.handlebars.render("commercial_invoice", &context)?;
+        
+        // Convert to PDF
+        let pdf_content = self.html_to_pdf(&html_content).await?;
+        
+        let document = GeneratedDocument {
+            id: Uuid::new_v4().to_string(),
+            doc_type: DocumentType::CommercialInvoice,
+            order_id: order.id.as_ref().unwrap().to_string(),
+            filename: format!("commercial_invoice_{}.pdf", order.order_number),
+            content: pdf_content,
+            generated_at: Utc::now(),
+            version: 1,
+            status: DocumentStatus::Generated,
+        };
+
+        Ok(document)
+    }
+
+    pub async fn generate_packing_list(
+        &self,
+        order: &Order,
+        packaging_details: &PackagingDetails
+    ) -> Result<GeneratedDocument, Box<dyn std::error::Error>> {
+        let context = self.prepare_packing_context(order, packaging_details)?;
+        
+        let html_content = self.handlebars.render("packing_list", &context)?;
+        let pdf_content = self.html_to_pdf(&html_content).await?;
+        
+        let document = GeneratedDocument {
+            id: Uuid::new_v4().to_string(),
+            doc_type: DocumentType::PackingList,
+            order_id: order.id.as_ref().unwrap().to_string(),
+            filename: format!("packing_list_{}.pdf", order.order_number),
+            content: pdf_content,
+            generated_at: Utc::now(),
+            version: 1,
+            status: DocumentStatus::Generated,
+        };
+
+        Ok(document)
+    }
+
+    pub async fn generate_certificate_of_origin(
+        &self,
+        order: &Order,
+        origin_details: &OriginDetails
+    ) -> Result<GeneratedDocument, Box<dyn std::error::Error>> {
+        let context = self.prepare_origin_context(order, origin_details)?;
+        
+        let html_content = self.handlebars.render("certificate_of_origin", &context)?;
+        let pdf_content = self.html_to_pdf(&html_content).await?;
+        
+        let document = GeneratedDocument {
+            id: Uuid::new_v4().to_string(),
+            doc_type: DocumentType::CertificateOfOrigin,
+            order_id: order.id.as_ref().unwrap().to_string(),
+            filename: format!("certificate_of_origin_{}.pdf", order.order_number),
+            content: pdf_content,
+            generated_at: Utc::now(),
+            version: 1,
+            status: DocumentStatus::Generated,
+        };
+
+        Ok(document)
+    }
+
+    fn prepare_invoice_context(
+        &self,
+        order: &Order,
+        exporter_details: &ExporterDetails
+    ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+        let mut context = serde_json::Map::new();
+        
+        // Order information
+        context.insert("order_number".to_string(), 
+            serde_json::Value::String(order.order_number.clone()));
+        context.insert("order_date".to_string(), 
+            serde_json::Value::String(order.created_at.format("%Y-%m-%d").to_string()));
+        
+        // Exporter information
+        context.insert("exporter".to_string(), serde_json::to_value(exporter_details)?);
+        
+        // Importer information
+        context.insert("importer".to_string(), serde_json::to_value(&order.client)?);
+        
+        // Products
+        let products: Vec<serde_json::Value> = order.products.iter()
+            .map(|p| {
+                let mut product = serde_json::to_value(p).unwrap();
+                // Add calculated fields
+                product["total_formatted"] = serde_json::Value::String(
+                    format!("{:.2}", p.total)
+                );
+                product
+            })
+            .collect();
+        context.insert("products".to_string(), serde_json::Value::Array(products));
+        
+        // Totals
+        let total_value: f64 = order.products.iter().map(|p| p.total).sum();
+        context.insert("total_value".to_string(), 
+            serde_json::Value::String(format!("{:.2}", total_value)));
+        context.insert("currency".to_string(), 
+            serde_json::Value::String(order.order_details.currency.clone()));
+        
+        // Terms
+        context.insert("payment_terms".to_string(), 
+            serde_json::Value::String(order.order_details.payment_terms.clone()));
+        context.insert("delivery_terms".to_string(), 
+            serde_json::Value::String(order.order_details.delivery_terms.clone()));
+
+        Ok(serde_json::Value::Object(context))
+    }
+
+    fn prepare_packing_context(
+        &self,
+        order: &Order,
+        packaging_details: &PackagingDetails
+    ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+        let mut context = serde_json::Map::new();
+        
+        context.insert("order_number".to_string(), 
+            serde_json::Value::String(order.order_number.clone()));
+        context.insert("packaging".to_string(), serde_json::to_value(packaging_details)?);
+        
+        // Calculate package information
+        let packages: Vec<serde_json::Value> = packaging_details.packages.iter()
+            .enumerate()
+            .map(|(i, pkg)| {
+                let mut package = serde_json::to_value(pkg).unwrap();
+                package["package_number"] = serde_json::Value::Number(
+                    serde_json::Number::from(i + 1)
+                );
+                package
+            })
+            .collect();
+        
+        context.insert("packages".to_string(), serde_json::Value::Array(packages));
+        
+        let total_packages = packaging_details.packages.len();
+        let total_weight: f64 = packaging_details.packages.iter()
+            .map(|p| p.net_weight + p.gross_weight).sum();
+        
+        context.insert("total_packages".to_string(), 
+            serde_json::Value::Number(serde_json::Number::from(total_packages)));
+        context.insert("total_weight".to_string(), 
+            serde_json::Value::String(format!("{:.2}", total_weight)));
+
+        Ok(serde_json::Value::Object(context))
+    }
+
+    async fn html_to_pdf(&self, html_content: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        // For now, return the HTML as bytes
+        // In production, use a library like wkhtmltopdf or headless Chrome
+        Ok(html_content.as_bytes().to_vec())
+    }
+}
+
+// Handlebars helpers
+fn format_currency_helper(
+    h: &handlebars::Helper,
+    _: &handlebars::Handlebars,
+    _: &handlebars::Context,
+    _: &mut handlebars::RenderContext,
+    out: &mut dyn handlebars::Output,
+) -> handlebars::HelperResult {
+    if let Some(param) = h.param(0) {
+        if let Some(amount) = param.value().as_f64() {
+            out.write(&format!("{:.2}", amount))?;
+        }
+    }
+    Ok(())
+}
+
+fn format_date_helper(
+    h: &handlebars::Helper,
+    _: &handlebars::Handlebars,
+    _: &handlebars::Context,
+    _: &mut handlebars::RenderContext,
+    out: &mut dyn handlebars::Output,
+) -> handlebars::HelperResult {
+    if let Some(param) = h.param(0) {
+        if let Some(date_str) = param.value().as_str() {
+            // Format date string
+            out.write(date_str)?;
+        }
+    }
+    Ok(())
+}
+
+fn upper_helper(
+    h: &handlebars::Helper,
+    _: &handlebars::Handlebars,
+    _: &handlebars::Context,
+    _: &mut handlebars::RenderContext,
+    out: &mut dyn handlebars::Output,
+) -> handlebars::HelperResult {
+    if let Some(param) = h.param(0) {
+        if let Some(text) = param.value().as_str() {
+            out.write(&text.to_uppercase())?;
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GeneratedDocument {
+    pub id: String,
+    pub doc_type: DocumentType,
+    pub order_id: String,
+    pub filename: String,
+    pub content: Vec<u8>,
+    pub generated_at: DateTime<Utc>,
+    pub version: u32,
+    pub status: DocumentStatus,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum DocumentStatus {
+    Generated,
+    Reviewed,
+    Approved,
+    Sent,
+    Received,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExporterDetails {
+    pub company_name: String,
+    pub address: Address,
+    pub contact: ContactInfo,
+    pub iec_number: String,
+    pub gst_number: String,
+    pub pan_number: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PackagingDetails {
+    pub packages: Vec<Package>,
+    pub total_volume: f64,
+    pub packing_method: String,
+    pub special_instructions: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Package {
+    pub contents: Vec<String>,
+    pub net_weight: f64,
+    pub gross_weight: f64,
+    pub dimensions: Dimensions,
+    pub package_type: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Dimensions {
+    pub length: f64,
+    pub width: f64,
+    pub height: f64,
+    pub unit: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OriginDetails {
+    pub country: String,
+    pub state: String,
+    pub certification_authority: String,
+    pub certificate_number: String,
+    pub issue_date: DateTime<Utc>,
+    pub validity: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Address {
+    pub line1: String,
+    pub line2: Option<String>,
+    pub city: String,
+    pub state: String,
+    pub postal_code: String,
+    pub country: String,
+}
+```
+
+---
+
+This completes Part 4 of the development guide. The final part will cover deployment, testing, and production considerations for the complete ExportExpressPro suite.

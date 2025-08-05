@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: exportpro_mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongodb_data:/data/db
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+
+  redis:
+    image: redis:7.0-alpine
+    container_name: exportpro_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  ai-engine:
+    build: ./ai-engine
+    container_name: exportpro_ai
+    ports:
+      - "8001:8001"
+    environment:
+      - MONGODB_URL=mongodb://admin:password@mongodb:27017/TheExportExpress?authSource=admin
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ./ai-engine:/app
+      - ai_models:/app/models
+
+  website-sync:
+    build: ./website-integration
+    container_name: exportpro_sync
+    ports:
+      - "3001:3001"
+    environment:
+      - MONGODB_URL=mongodb://admin:password@mongodb:27017/TheExportExpress?authSource=admin
+      - REDIS_URL=redis://redis:6379
+      - AI_ENGINE_URL=http://ai-engine:8001
+    depends_on:
+      - mongodb
+      - redis
+      - ai-engine
+
+volumes:
+  mongodb_data:
+  redis_data:
+  ai_models:

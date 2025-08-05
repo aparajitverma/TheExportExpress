@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExportExpressPro - Auth Cache Clearer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .info {
+            color: #17a2b8;
+        }
+        pre {
+            background: #333;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>ExportExpressPro - Authentication Cache Clearer</h1>
+    
+    <div class="container">
+        <h2>Clear Authentication Cache</h2>
+        <p>This will clear all stored authentication data from your browser.</p>
+        <button onclick="clearAuthCache()">Clear Auth Cache</button>
+        <div id="clearResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>Test Backend Connection</h2>
+        <p>Test if the backend is accessible and working properly.</p>
+        <button onclick="testBackendHealth()">Test Backend Health</button>
+        <button onclick="testLogin()">Test Login</button>
+        <div id="backendResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>Current Auth Status</h2>
+        <p>Check what authentication data is currently stored.</p>
+        <button onclick="checkAuthStatus()">Check Auth Status</button>
+        <div id="authStatus"></div>
+    </div>
+
+    <div class="container">
+        <h2>Quick Links</h2>
+        <p><a href="http://localhost:5173" target="_blank">Frontend Website</a></p>
+        <p><a href="http://localhost:3000/api/health" target="_blank">Backend Health Check</a></p>
+        <p><a href="http://localhost:5173/test" target="_blank">Connection Test Page</a></p>
+    </div>
+
+    <script>
+        function clearAuthCache() {
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                document.getElementById('clearResult').innerHTML = 
+                    '<p class="success">✅ Authentication cache cleared successfully!</p>';
+            } catch (error) {
+                document.getElementById('clearResult').innerHTML = 
+                    '<p class="error">❌ Error clearing cache: ' + error.message + '</p>';
+            }
+        }
+
+        async function testBackendHealth() {
+            const resultDiv = document.getElementById('backendResult');
+            resultDiv.innerHTML = '<p class="info">Testing backend health...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/health');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ Backend is healthy!</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <p class="error">❌ Backend health check failed</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <p class="error">❌ Cannot connect to backend</p>
+                    <p>Error: ${error.message}</p>
+                    <p>Make sure the backend is running on port 3000</p>
+                `;
+            }
+        }
+
+        async function testLogin() {
+            const resultDiv = document.getElementById('backendResult');
+            resultDiv.innerHTML = '<p class="info">Testing login...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@example.com',
+                        password: 'Admin@123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ Login successful!</p>
+                        <p>Token: ${data.data.token.substring(0, 50)}...</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <p class="error">❌ Login failed</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <p class="error">❌ Login test failed</p>
+                    <p>Error: ${error.message}</p>
+                `;
+            }
+        }
+
+        function checkAuthStatus() {
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+            
+            const statusDiv = document.getElementById('authStatus');
+            
+            if (token) {
+                statusDiv.innerHTML = `
+                    <p class="info">🔑 Token found in localStorage</p>
+                    <p>Token: ${token.substring(0, 50)}...</p>
+                    ${user ? `<p>User: ${user}</p>` : '<p>No user data found</p>'}
+                `;
+            } else {
+                statusDiv.innerHTML = '<p class="success">✅ No authentication data found (this is normal for a fresh start)</p>';
+            }
+        }
+
+        // Auto-check auth status on page load
+        window.onload = function() {
+            checkAuthStatus();
+        };
+    </script>
+</body>
+</html> 
