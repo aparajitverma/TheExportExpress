@@ -14,6 +14,7 @@ import {
   updateVendorStatus,
   verifyVendor,
   updateVendorMetrics,
+  getVendorPerformance,
   getVendorStats,
   bulkImportVendors,
   getVendorTemplate
@@ -82,6 +83,9 @@ router.patch('/:id/verify', verifyVendor);
 
 // Update vendor performance metrics
 router.patch('/:id/metrics', updateVendorMetrics);
+
+// Get vendor performance analytics
+router.get('/:id/performance', getVendorPerformance);
 
 // Bulk import vendors from CSV
 router.post('/bulk/import', uploadCSV, bulkImportVendors);

@@ -8,16 +8,7 @@ interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
-const menuItemVariants = {
-  hidden: { opacity: 0, x: -20 },
-  visible: (i: number) => ({
-    opacity: 1,
-    x: 0,
-    transition: {
-      delay: i * 0.1,
-    },
-  }),
-};
+// Removed menu item animations
 
 const sidebarVariants = {
   open: { x: 0, width: '16rem' },
@@ -43,8 +34,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { path: '/admin/inquiries', label: 'Inquiries', icon: '📧', description: 'B2B Inquiries', badge: '5' },
     { path: '/admin/bulk-import', label: 'Bulk Import', icon: '📥', description: 'Import Products' },
     { path: '/admin/vendors', label: 'Vendors', icon: '🏭', description: 'Supplier Management' },
-    { path: '/admin/orders', label: 'Orders', icon: '📋', description: 'Order Tracking', comingSoon: true },
-    { path: '/admin/analytics', label: 'Analytics', icon: '📈', description: 'Business Reports', comingSoon: true },
+    { path: '/admin/orders', label: 'Orders', icon: '📋', description: 'Order Tracking' },
+    { path: '/admin/payments', label: 'Payments', icon: '💳', description: 'Payment Management' },
+    { path: '/admin/shipment-tracking', label: 'Shipments', icon: '🚢', description: 'Shipment Tracking' },
+    { path: '/admin/trade-analytics', label: 'Trade Analytics', icon: '📈', description: 'Arbitrage Analysis' },
     { path: '/admin/settings', label: 'Settings', icon: '⚙️', description: 'System Settings' },
   ];
 
@@ -103,15 +96,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </div>
 
             {/* Navigation */}
-            <nav className="mt-8 px-4 space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto">
-              {menuItems.map((item, index) => (
-                <motion.div
-                  key={item.path}
-                  custom={index}
-                  initial="hidden"
-                  animate="visible"
-                  variants={menuItemVariants}
-                >
+            <nav className="mt-8 px-4 space-y-2 max-h-[calc(100vh-120px)] overflow-y-auto">
+              {menuItems.map((item) => (
+                <div key={item.path}>
                   {item.comingSoon ? (
                     <div className="group flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-500 cursor-not-allowed opacity-50">
                       <span className="mr-3 text-lg">{item.icon}</span>
@@ -149,24 +136,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       </div>
                     </Link>
                   )}
-                </motion.div>
+                </div>
               ))}
             </nav>
 
-            {/* User Info & Logout */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700"
-            >
-              {user && (
-                <div className="mb-4 p-3 bg-gray-700/50 rounded-lg">
-                  <p className="text-sm text-gray-400">Logged in as</p>
-                  <p className="font-medium text-blue-400">{user.name}</p>
-                  <p className="text-xs text-emerald-400">{user.role}</p>
-                </div>
-              )}
+            {/* Logout Actions */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700">
               <div className="flex gap-2">
                 <button
                   onClick={() => navigate('/')}
@@ -183,7 +158,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   Logout
                 </button>
               </div>
-            </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -32,4 +32,9 @@ export class ForbiddenError extends ApiError {
   constructor(message = 'Forbidden') {
     super(403, message, true);
   }
-} 
+}
+
+// Async handler to wrap async functions and catch errors
+export const asyncHandler = (fn: Function) => (req: any, res: any, next: any) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+}; 

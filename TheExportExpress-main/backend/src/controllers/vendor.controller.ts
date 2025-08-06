@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import { Vendor, IVendor } from '../models/Vendor';
 import { Category } from '../models/Category';
-import { ApiError } from '../utils/ApiError';
+import Order from '../models/Order';
+import { ApiError, asyncHandler } from '../utils/ApiError';
 import { sendSuccess, sendError } from '../utils/response';
 
 // Get all vendors with pagination, filtering, and sorting
@@ -466,4 +467,101 @@ export const getVendorTemplate = async (req: Request, res: Response) => {
     console.error('Error generating vendor template:', error);
     sendError(res, 'Failed to generate template', 500);
   }
-}; 
+};
+
+// Update vendor performance metrics (for interconnected system)
+export const updateVendorMetrics = asyncHandler(async (req: Request, res: Response) => {
+  const { vendorId } = req.params;
+  const { action } = req.body;
+
+  const vendor = await Vendor.findById(vendorId);
+  if (!vendor) {
+    throw new ApiError(404, 'Vendor not found');
+  }
+
+  // Update metrics based on action
+  switch (action) {
+    case 'order_received':
+      vendor.reliabilityScore = Math.min(100, (vendor.reliabilityScore || 70) + 1);
+      break;
+    case 'order_processing':
+      vendor.qualityScore = Math.min(100, (vendor.qualityScore || 70) + 0.5);
+      break;
+    case 'order_delivered':
+      vendor.reliabilityScore = Math.min(100, (vendor.reliabilityScore || 70) + 2);
+      vendor.deliveryScore = Math.min(100, (vendor.deliveryScore || 70) + 3);
+      vendor.rating = Math.min(5, (vendor.rating || 3) + 0.1);
+      break;
+    case 'order_cancelled':
+      vendor.reliabilityScore = Math.max(0, (vendor.reliabilityScore || 70) - 5);
+      break;
+  }
+
+  await vendor.save();
+  
+  sendSuccess(res, { 
+    metrics: { 
+      rating: vendor.rating,
+      reliabilityScore: vendor.reliabilityScore,
+      qualityScore: vendor.qualityScore,
+      deliveryScore: vendor.deliveryScore
+    }
+  }, 'Vendor metrics updated successfully');
+});
+
+// Get vendor performance analytics
+export const getVendorPerformance = asyncHandler(async (req: Request, res: Response) => {
+  const { vendorId } = req.params;
+
+  const vendor = await Vendor.findById(vendorId);
+  if (!vendor) {
+    throw new ApiError(404, 'Vendor not found');
+  }
+
+  // Get order statistics for this vendor
+  const orderStats = await Order.aggregate([
+    {
+      $match: { 'items.vendor': vendor._id }
+    },
+    {
+      $group: {
+        _id: null,
+        totalOrders: { $sum: 1 },
+        completedOrders: {
+          $sum: { $cond: [{ $eq: ['$orderStatus', 'delivered'] }, 1, 0] }
+        },
+        cancelledOrders: {
+          $sum: { $cond: [{ $eq: ['$orderStatus', 'cancelled'] }, 1, 0] }
+        },
+        totalValue: { $sum: '$finalAmount' },
+        avgOrderValue: { $avg: '$finalAmount' }
+      }
+    }
+  ]);
+
+  const performance = {
+    vendor: {
+      companyName: vendor.companyName,
+      status: vendor.status,
+      rating: vendor.rating,
+      reliabilityScore: vendor.reliabilityScore,
+      qualityScore: vendor.qualityScore,
+      deliveryScore: vendor.deliveryScore
+    },
+    orders: orderStats[0] || {
+      totalOrders: 0,
+      completedOrders: 0,
+      cancelledOrders: 0,
+      totalValue: 0,
+      avgOrderValue: 0
+    },
+    metrics: {
+      completionRate: orderStats[0] ? 
+        (orderStats[0].completedOrders / orderStats[0].totalOrders * 100).toFixed(2) : 0,
+      cancellationRate: orderStats[0] ? 
+        (orderStats[0].cancelledOrders / orderStats[0].totalOrders * 100).toFixed(2) : 0
+    }
+  };
+
+  sendSuccess(res, performance, 'Vendor performance data retrieved successfully');
+}); 

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import {
   PlusIcon,
   MagnifyingGlassIcon,
+  FunnelIcon,
   ArrowDownTrayIcon,
   EyeIcon,
   PencilIcon,
@@ -12,7 +14,10 @@ import {
   StarIcon,
   BuildingOfficeIcon,
   PhoneIcon,
-  EnvelopeIcon
+  EnvelopeIcon,
+  MapPinIcon,
+  CurrencyDollarIcon,
+  TrophyIcon
 } from '@heroicons/react/24/outline';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { UnifiedForm, FormField } from '../../components/admin/UnifiedForm';
@@ -253,6 +258,7 @@ const Vendors: React.FC = () => {
     exportData,
     hasSelection,
     allSelected,
+    partialSelection
   } = useVendors();
 
   const [showVendorForm, setShowVendorForm] = useState(false);
@@ -320,7 +326,12 @@ const Vendors: React.FC = () => {
     }
   };
 
-
+  const formatCurrency = (amount: number, currency: string = 'USD') => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency
+    }).format(amount);
+  };
 
   return (
     <AdminLayout>
@@ -653,6 +664,10 @@ const Vendors: React.FC = () => {
           <VendorDetails
             vendor={selectedVendor}
             onClose={() => setShowVendorDetails(false)}
+            onEdit={() => {
+              setShowVendorDetails(false);
+              handleEditVendor(selectedVendor);
+            }}
           />
         )}
       </div>

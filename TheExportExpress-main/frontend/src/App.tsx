@@ -27,6 +27,10 @@ import AdminInquiries from './pages/admin/Inquiries';
 import AdminSettings from './pages/admin/Settings';
 import BulkImport from './pages/admin/BulkImport';
 import Vendors from './pages/admin/Vendors';
+import Orders from './pages/admin/Orders';
+import Payments from './pages/admin/Payments';
+import ShipmentTracking from './pages/admin/ShipmentTracking';
+import TradeAnalytics from './pages/admin/TradeAnalytics';
 import NotFound from './pages/NotFound';
 import TestConnection from './pages/TestConnection';
 import { setupAxiosInterceptors } from './utils/authUtils';
@@ -117,6 +121,10 @@ function AppContent() {
                         <Route path="categories/edit/:categoryId" element={<EditCategory />} />
                         <Route path="bulk-import" element={<BulkImport />} />
                         <Route path="vendors" element={<Vendors />} />
+                        <Route path="orders" element={<Orders />} />
+                        <Route path="payments" element={<Payments />} />
+                        <Route path="shipment-tracking" element={<ShipmentTracking />} />
+                        <Route path="trade-analytics" element={<TradeAnalytics />} />
                         <Route path="users" element={<AdminUsers />} />
                         <Route path="inquiries" element={<AdminInquiries />} />
                         <Route path="settings" element={<AdminSettings />} />
