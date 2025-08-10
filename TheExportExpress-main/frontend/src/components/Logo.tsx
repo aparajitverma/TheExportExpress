@@ -21,7 +21,7 @@ const Logo: React.FC<LogoProps> = ({ className = '', showTagline = false }) => {
           <div className="w-10 h-10 relative">
             <div className="absolute inset-0 bg-gradient-to-r from-[#a259ff] to-white opacity-20 rounded-lg blur-sm"></div>
             <div className="relative w-full h-full flex items-center justify-center">
-              <span className="text-2xl font-bold text-white">E</span>
+              <span className="text-2xl font-bold text-black">E</span>
             </div>
           </div>
           

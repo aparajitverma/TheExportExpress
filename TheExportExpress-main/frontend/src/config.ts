@@ -1,4 +1,8 @@
-// Backend can run on ports 3000-3003
+// Prefer explicit API base URL from environment when deployed
+// e.g., VITE_API_BASE_URL="https://api.yourdomain.com"
+const ENV_API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+
+// Backend can run on ports 3000-3003 during development
 const API_PORTS = [3000, 3001, 3002, 3003];
 const BASE_URL = "http://localhost";
 
@@ -35,12 +39,18 @@ export const getActivePort = async (): Promise<number> => {
 
 // API_URL is now a function that returns a promise resolving to the base URL.
 export const getApiUrl = async (): Promise<string> => {
+  if (ENV_API_BASE_URL) {
+    return ENV_API_BASE_URL.replace(/\/$/, '');
+  }
   const port = await getActivePort();
   return `${BASE_URL}:${port}`;
 };
 
 // UPLOADS_URL will also become a function for consistency
 export const getUploadsUrl = async (): Promise<string> => {
+  if (ENV_API_BASE_URL) {
+    return `${ENV_API_BASE_URL.replace(/\/$/, '')}/uploads`;
+  }
   const port = await getActivePort();
   return `${BASE_URL}:${port}/uploads`;
 };

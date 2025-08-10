@@ -1,0 +1,232 @@
+/**
+ * Minimalistic Monochrome Design System
+ * Black and White Design Approach
+ */
+
+/* Minimalist Color Variables */
+:root {
+  --mono-black: #000000;
+  --mono-white: #ffffff;
+  --mono-gray-100: #f5f5f5;
+  --mono-gray-200: #e5e5e5;
+  --mono-gray-300: #d4d4d4;
+  --mono-gray-400: #a3a3a3;
+  --mono-gray-500: #737373;
+  --mono-gray-600: #525252;
+  --mono-gray-700: #404040;
+  --mono-gray-800: #262626;
+  --mono-gray-900: #171717;
+
+  /* Minimalist Typography */
+  --mono-font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono-font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  
+  /* Minimalist Spacing */
+  --mono-space-xs: 0.25rem;   /* 4px */
+  --mono-space-sm: 0.5rem;    /* 8px */
+  --mono-space-md: 1rem;      /* 16px */
+  --mono-space-lg: 1.5rem;    /* 24px */
+  --mono-space-xl: 2rem;      /* 32px */
+  --mono-space-2xl: 3rem;     /* 48px */
+  --mono-space-3xl: 4rem;     /* 64px */
+
+  /* Minimalist Transitions */
+  --mono-transition-fast: 0.15s ease-out;
+  --mono-transition-normal: 0.3s ease-out;
+  --mono-transition-slow: 0.5s ease-out;
+
+  /* Minimalist Shadows */
+  --mono-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --mono-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --mono-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --mono-shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Minimalist Base Styles */
+.mono-container {
+  background: var(--mono-white);
+  color: var(--mono-black);
+  font-family: var(--mono-font-primary);
+}
+
+/* Minimalist Typography Classes */
+.mono-text-hero {
+  font-size: clamp(2.5rem, 8vw, 6rem);
+  font-weight: 100;
+  letter-spacing: 0.2em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.mono-text-title {
+  font-size: clamp(1.5rem, 4vw, 3rem);
+  font-weight: 200;
+  letter-spacing: 0.15em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.mono-text-subtitle {
+  font-size: clamp(0.875rem, 2vw, 1.125rem);
+  font-weight: 300;
+  letter-spacing: 0.3em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.mono-text-body {
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+}
+
+.mono-text-caption {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+/* Minimalist Button Styles */
+.mono-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--mono-space-md) var(--mono-space-xl);
+  font-family: var(--mono-font-primary);
+  font-size: 0.875rem;
+  font-weight: 300;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: all var(--mono-transition-normal);
+  position: relative;
+  overflow: hidden;
+}
+
+.mono-btn-primary {
+  background: var(--mono-black);
+  color: var(--mono-white);
+}
+
+.mono-btn-primary:hover {
+  background: var(--mono-gray-800);
+}
+
+.mono-btn-secondary {
+  background: transparent;
+  color: var(--mono-black);
+  border: 1px solid var(--mono-black);
+}
+
+.mono-btn-secondary:hover {
+  background: var(--mono-black);
+  color: var(--mono-white);
+}
+
+/* Minimalist Layout Components */
+.mono-grid {
+  display: grid;
+  gap: var(--mono-space-lg);
+}
+
+.mono-flex {
+  display: flex;
+  gap: var(--mono-space-md);
+}
+
+.mono-flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Minimalist Borders and Lines */
+.mono-border {
+  border: 1px solid var(--mono-black);
+}
+
+.mono-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--mono-black);
+}
+
+/* Minimalist Animation Classes */
+.mono-fade-in {
+  opacity: 0;
+  animation: monoFadeIn 0.8s ease-out forwards;
+}
+
+.mono-slide-up {
+  opacity: 0;
+  transform: translateY(30px);
+  animation: monoSlideUp 0.8s ease-out forwards;
+}
+
+/* Minimalist Keyframe Animations */
+@keyframes monoFadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes monoSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Minimalist Responsive Design */
+@media (max-width: 640px) {
+  .mono-text-hero {
+    font-size: 2.5rem;
+    letter-spacing: 0.1em;
+  }
+  
+  .mono-text-title {
+    font-size: 1.5rem;
+    letter-spacing: 0.1em;
+  }
+  
+  .mono-btn {
+    padding: var(--mono-space-sm) var(--mono-space-lg);
+    font-size: 0.75rem;
+  }
+}
+
+/* Minimalist Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .mono-fade-in,
+  .mono-slide-up {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Minimalist Print Styles */
+@media print {
+  .mono-container {
+    background: white;
+    color: black;
+  }
+  
+  .mono-btn {
+    border: 1px solid black;
+    background: white;
+    color: black;
+  }
+}

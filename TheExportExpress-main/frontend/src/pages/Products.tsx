@@ -74,10 +74,10 @@ export default function Products() {
   if (loading) {
     return (
       <div className="min-h-screen flex justify-center items-center px-4">
-        <div className="card-strong p-12 text-center max-w-md mx-auto">
-          <div className="animate-spin w-16 h-16 border-4 border-purple-500/30 border-t-purple-500 rounded-full mx-auto mb-6"></div>
-          <h2 className="text-2xl font-bold cosmic-text mb-4">Loading Products</h2>
-          <p className="text-gray-400">Discovering amazing export opportunities...</p>
+        <div className="card-strong p-10 text-center max-w-md mx-auto">
+          <div className="animate-spin w-10 h-10 border-4 border-gray-200 border-t-[var(--color-primary)] rounded-full mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--color-primary-dark)' }}>Loading Products</h2>
+          <p className="text-gray-500">Discovering amazing export opportunities...</p>
         </div>
       </div>
     );
@@ -86,13 +86,13 @@ export default function Products() {
   if (error) {
     return (
       <div className="min-h-screen flex justify-center items-center p-4">
-        <div className="card-strong p-12 border-red-500/30 text-center max-w-lg mx-auto">
-          <i className="fas fa-exclamation-triangle text-5xl text-red-400 mb-6"></i>
-          <h2 className="text-3xl font-bold text-red-400 mb-6">Error Loading Products</h2>
-          <p className="text-gray-300 mb-8 text-lg">{error}</p>
+        <div className="card-strong p-10 text-center max-w-lg mx-auto">
+          <i className="fas fa-exclamation-triangle text-4xl text-red-600 mb-4"></i>
+          <h2 className="text-2xl font-semibold mb-4" style={{ color: '#991b1b' }}>Error Loading Products</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
           <button 
             onClick={() => fetchProducts(currentApiUrl)}
-            className="btn-primary bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 hover:border-red-400/50"
+            className="btn-primary"
           >
             <i className="fas fa-refresh mr-2"></i>
             Try Again
@@ -103,25 +103,16 @@ export default function Products() {
   }
 
   return (
-    <div className="min-h-screen py-16 px-4 sm:px-6 lg:px-8 relative">
-      {/* Background elements */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="floating-orb w-64 h-64 top-20 right-10 animate-float opacity-10"></div>
-        <div className="floating-orb w-48 h-48 bottom-32 left-10 animate-float-delayed opacity-10"></div>
-      </div>
+    <div className="min-h-screen py-16 px-4 sm:px-6 lg:px-8">
 
       {/* Header Section */}
       <motion.div 
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-7xl mx-auto text-center mb-16 relative z-10"
+        className="max-w-7xl mx-auto text-center mb-16"
       >
-        <h1 className="text-5xl md:text-6xl font-bold mb-8 cosmic-text-strong">
-          Our Premium Export Products
-        </h1>
-        <p className="text-xl md:text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed">
-          Discover our curated selection of high-quality products ready for global export
-        </p>
+        <h1 className="mb-4" style={{ fontSize: 'var(--fs-h2-d)', lineHeight: 'var(--lh-h2)', fontWeight: 700, color: 'var(--color-primary-dark)' }}>Our Premium Export Products</h1>
+        <p className="text-gray-600 max-w-3xl mx-auto">Discover our curated selection of high-quality products ready for global export</p>
       </motion.div>
 
       {/* Search and Filter Section */}
@@ -129,20 +120,20 @@ export default function Products() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}
-        className="max-w-6xl mx-auto mb-16 relative z-10"
+        className="max-w-6xl mx-auto mb-16"
       >
-        <div className="card-strong p-8">
+        <div className="card-strong p-6">
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Search Input */}
             <div className="flex-1">
               <div className="relative">
-                <i className="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-purple-400"></i>
+                <i className="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                 <input
                   type="text"
                   placeholder="Search products, descriptions..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="cosmic-input pl-12 text-lg"
+                  className="cosmic-input pl-12"
                 />
               </div>
             </div>
@@ -150,11 +141,11 @@ export default function Products() {
             {/* Category Filter */}
             <div className="w-full lg:w-80">
               <div className="relative">
-                <i className="fas fa-filter absolute left-4 top-1/2 transform -translate-y-1/2 text-purple-400"></i>
+                <i className="fas fa-filter absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="cosmic-input pl-12 text-lg appearance-none cursor-pointer"
+                  className="cosmic-input pl-12 appearance-none cursor-pointer"
                 >
                   <option value="all">All Categories</option>
                   {/* Add category options here */}
@@ -165,9 +156,9 @@ export default function Products() {
           </div>
 
           {/* Results count */}
-          <div className="mt-6 pt-6 border-t border-purple-500/20">
-            <p className="text-gray-400 text-lg">
-              <span className="text-purple-400 font-semibold">{filteredProducts.length}</span> 
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <p className="text-gray-600">
+              <span className="font-medium text-[var(--color-primary-dark)]">{filteredProducts.length}</span> 
               {filteredProducts.length === 1 ? ' product' : ' products'} found
             </p>
           </div>
@@ -179,7 +170,7 @@ export default function Products() {
         variants={container}
         initial="hidden"
         animate="show"
-        className="max-w-7xl mx-auto relative z-10"
+        className="max-w-7xl mx-auto"
       >
         {filteredProducts.length === 0 ? (
           <div className="card-strong p-16 text-center">
@@ -205,7 +196,7 @@ export default function Products() {
                 variants={item}
                 className="group"
               >
-                <div className="cosmic-card h-full flex flex-col">
+                <div className="card h-full flex flex-col">
                   {/* Product Image */}
                   <div className="relative aspect-[4/3] overflow-hidden rounded-xl mb-6">
                     {product.images && product.images[0] ? (
@@ -215,17 +206,17 @@ export default function Products() {
                         className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-purple-500/20 to-purple-600/20 flex items-center justify-center">
-                        <i className="fas fa-image text-4xl text-purple-400 opacity-50"></i>
+                      <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                        <i className="fas fa-image text-3xl text-gray-400"></i>
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     
                     {/* Hover overlay with quick view */}
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                       <Link
                         to={`/products/${product._id}`}
-                        className="cosmic-button px-6 py-3 transform scale-90 group-hover:scale-100 transition-transform duration-300"
+                        className="btn-primary"
                       >
                         <i className="fas fa-eye mr-2"></i>
                         View Details
@@ -236,25 +227,25 @@ export default function Products() {
                   {/* Product Info */}
                   <div className="flex-1 flex flex-col">
                     <div className="mb-4">
-                      <span className="text-sm px-3 py-1 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-medium">
+                      <span className="text-sm px-3 py-1 rounded-full bg-gray-100 text-gray-700 border border-gray-200 font-medium">
                         {typeof product.category === 'object' ? product.category.name : 'Category'}
                       </span>
                     </div>
                     
-                    <h3 className="text-xl font-bold mb-3 cosmic-text line-clamp-2 group-hover:text-purple-300 transition-colors duration-300">
+                    <h3 className="text-lg font-semibold mb-2 line-clamp-2 group-hover:text-gray-900">
                       {product.name}
                     </h3>
                     
-                    <p className="text-gray-400 text-sm mb-4 line-clamp-3 leading-relaxed flex-1">
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-3 leading-relaxed flex-1">
                       {product.shortDescription || product.description}
                     </p>
                     
                     <Link
                       to={`/products/${product._id}`}
-                      className="w-full text-center btn-secondary group-hover:bg-purple-500/20 transition-all duration-300"
+                      className="w-full text-center btn-secondary"
                     >
                       Learn More
-                      <i className="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform duration-300"></i>
+                      <i className="fas fa-arrow-right ml-2"></i>
                     </Link>
                   </div>
                 </div>

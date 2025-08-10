@@ -33,6 +33,16 @@ import ShipmentTracking from './pages/admin/ShipmentTracking';
 import TradeAnalytics from './pages/admin/TradeAnalytics';
 import NotFound from './pages/NotFound';
 import TestConnection from './pages/TestConnection';
+import FlowOverview from './pages/admin/flow/FlowOverview';
+import Phase1 from './pages/admin/flow/Phase1';
+import Phase2 from './pages/admin/flow/Phase2';
+import Phase3 from './pages/admin/flow/Phase3';
+import Phase4 from './pages/admin/flow/Phase4';
+import Phase5 from './pages/admin/flow/Phase5';
+import OrderTracker from './pages/admin/flow/OrderTracker';
+import TradeServices from './pages/TradeServices';
+import CaseStudies from './pages/CaseStudies';
+import Compliance from './pages/Compliance';
 import { setupAxiosInterceptors } from './utils/authUtils';
 import './index.css'; // Ensure global styles are loaded
 
@@ -42,39 +52,13 @@ function AppContent() {
   const isAdminRoute = location.pathname.startsWith('/admin');
 
   return (
-    <div className="relative min-h-screen font-cosmic text-white flex flex-col overflow-hidden cosmic-bg">
-      {/* Enhanced Parallax Background with Floating Orbs */}
-      <div className="fixed inset-0 z-0 parallax-container">
-        {/* Base black background */}
-        <div className="absolute inset-0 bg-black"></div>
-        
-        {/* Animated floating orbs */}
-        <div className="floating-orb w-96 h-96 top-10 left-10 animate-float"></div>
-        <div className="floating-orb w-64 h-64 top-1/2 right-20 animate-float-delayed"></div>
-        <div className="floating-orb w-80 h-80 bottom-20 left-1/3 animate-float-slow"></div>
-        
-        {/* Multiple gradient layers for depth */}
-        <div className="absolute inset-0 bg-cosmic-gradient animate-pulse-cosmic"></div>
-        <div className="absolute inset-0 bg-cosmic-gradient-2 animate-pulse-cosmic" style={{ animationDelay: '-2s', animationDuration: '8s' }}></div>
-        <div className="absolute inset-0 bg-cosmic-gradient-3 animate-pulse-cosmic" style={{ animationDelay: '-4s', animationDuration: '12s' }}></div>
-        
-        {/* Additional atmospheric layers */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/5 via-transparent to-purple-800/5"></div>
-        <div className="absolute inset-0 bg-gradient-to-tl from-purple-700/5 via-transparent to-purple-900/5"></div>
-        
-        {/* Subtle noise texture overlay */}
-        <div className="absolute inset-0 opacity-20 bg-gradient-to-r from-transparent via-purple-500/5 to-transparent animate-shimmer"></div>
-      </div>
-
-      {/* Main Content Container with Glass Effect */}
+    <div className="relative min-h-screen font-cosmic text-gray-900 flex flex-col overflow-hidden bg-white">
+      {/* Main Content Container */}
       <div className="relative z-10 flex flex-col min-h-screen">
         {/* Only show navbar for non-admin routes */}
         {!isAdminRoute && <Navbar />}
         
         <main className={`flex-grow relative ${!isAdminRoute ? 'pt-16' : ''}`}>
-          {/* Content overlay for better glassmorphism */}
-          <div className="absolute inset-0 bg-black/10 backdrop-blur-xs"></div>
-          
           <div className="relative z-10">
             <Routes>
               {/* Public Routes */}
@@ -84,6 +68,9 @@ function AppContent() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/about" element={<AboutPage />} />
+              <Route path="/services" element={<TradeServices />} />
+              <Route path="/case-studies" element={<CaseStudies />} />
+              <Route path="/compliance" element={<Compliance />} />
               <Route path="/contact-us" element={<ContactUs />} />
               <Route path="/test" element={<TestConnection />} />
               
@@ -113,6 +100,14 @@ function AppContent() {
                     <AdminLayout>
                       <Routes>
                         <Route path="dashboard" element={<AdminDashboard />} />
+                        <Route path="flow" element={<FlowOverview />} />
+                        <Route path="flow/phase-1" element={<Phase1 />} />
+                        <Route path="flow/phase-2" element={<Phase2 />} />
+                        <Route path="flow/phase-3" element={<Phase3 />} />
+                        <Route path="flow/phase-4" element={<Phase4 />} />
+                        <Route path="flow/phase-5" element={<Phase5 />} />
+                        <Route path="flow/order-tracker" element={<OrderTracker />} />
+                        <Route path="flow/order-tracker/:orderId" element={<OrderTracker />} />
                         <Route path="products" element={<AdminProducts />} />
                         <Route path="products/new" element={<AddProduct />} />
                         <Route path="products/edit/:productId" element={<EditProduct />} />

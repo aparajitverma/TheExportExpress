@@ -36,6 +36,12 @@ const Sidebar = () => {
   const navHoverBg = useColorModeValue('gray.50', 'gray.700');
 
   const navigation = [
+    { name: 'Flow Overview', href: '/flow', icon: Home },
+    { name: 'Phase 1', href: '/phase-1', icon: Package },
+    { name: 'Phase 2', href: '/phase-2', icon: ShoppingCart },
+    { name: 'Phase 3', href: '/phase-3', icon: TrendingUp },
+    { name: 'Phase 4', href: '/phase-4', icon: Users },
+    { name: 'Phase 5', href: '/phase-5', icon: Settings },
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Products', href: '/products', icon: Package },
     { name: 'Orders', href: '/orders', icon: ShoppingCart },

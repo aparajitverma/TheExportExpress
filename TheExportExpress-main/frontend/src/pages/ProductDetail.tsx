@@ -96,13 +96,9 @@ export default function ProductDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 pt-24 px-4">
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex items-center justify-center"
-        >
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="min-h-screen pt-24 px-4">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center justify-center">
+          <div className="animate-spin h-10 w-10 border-4 border-gray-200 border-t-[var(--color-primary)] rounded-full"></div>
         </motion.div>
       </div>
     );
@@ -110,28 +106,19 @@ export default function ProductDetail() {
 
   if (error || !product) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 pt-24 px-4">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-7xl mx-auto text-center"
-        >
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent mb-4">
-            {error || 'Product not found'}
-          </h2>
-          <button
-            onClick={() => navigate('/products')}
-            className="px-6 py-2 bg-gradient-to-r from-blue-500 to-emerald-500 text-white rounded-full hover:from-blue-600 hover:to-emerald-600 transition-all duration-300 shadow-lg hover:shadow-xl"
-          >
-            Back to Products
-          </button>
+      <div className="min-h-screen pt-24 px-4">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-3xl mx-auto text-center">
+          <div className="card-strong p-8">
+            <h2 className="text-xl font-semibold mb-3" style={{ color: 'var(--color-primary-dark)' }}>{error || 'Product not found'}</h2>
+            <button onClick={() => navigate('/products')} className="btn-primary">Back to Products</button>
+          </div>
         </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black pt-24 px-4">
+    <div className="min-h-screen bg-white pt-24 px-4">
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -144,7 +131,7 @@ export default function ProductDetail() {
             animate={{ opacity: 1, x: 0 }}
             className="space-y-4"
           >
-            <div className="backdrop-blur-lg bg-black/60 rounded-xl overflow-hidden border border-[#a259ff]/30 shadow-xl">
+            <div className="card overflow-hidden p-0">
               <img
                 src={`${currentUploadsUrl}/${selectedImage || product.images[0]}`}
                 alt={product.name}
@@ -156,11 +143,9 @@ export default function ProductDetail() {
                 <button
                   key={image}
                   onClick={() => setSelectedImage(image)}
-                  className={`backdrop-blur-lg bg-black/60 rounded-lg overflow-hidden border ${
-                    (selectedImage || product.images[0]) === image
-                      ? 'border-[#a259ff]'
-                      : 'border-[#a259ff]/20'
-                  } transition-all duration-300 hover:border-[#a259ff]`}
+                  className={`rounded-lg overflow-hidden border ${
+                    (selectedImage || product.images[0]) === image ? 'border-[var(--color-primary)]' : 'border-gray-200'
+                  } transition-colors duration-200 hover:border-[var(--color-primary)] bg-white`}
                 >
                   <img
                     src={`${currentUploadsUrl}/${image}`}
@@ -178,36 +163,32 @@ export default function ProductDetail() {
             animate={{ opacity: 1, x: 0 }}
             className="space-y-6"
           >
-            <div className="backdrop-blur-lg bg-black/60 rounded-xl p-6 border border-[#a259ff]/30 shadow-xl">
-              <h1 className="text-3xl font-bold uppercase tracking-widest bg-gradient-to-r from-white via-[#a259ff] to-white bg-clip-text text-transparent mb-4" style={{ fontFamily: 'Montserrat, Roboto, "DIN Next Pro", Arial, sans-serif' }}>
-                {product.name}
-              </h1>
-              <p className="text-gray-200 mb-6">{product.description}</p>
+            <div className="card-strong">
+              <h1 className="mb-2" style={{ fontSize: 'var(--fs-h2-d)', lineHeight: 'var(--lh-h2)', fontWeight: 700, color: 'var(--color-primary-dark)' }}>{product.name}</h1>
+              <p className="text-gray-700 mb-6">{product.description}</p>
               
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Category</span>
-                  <span className="text-[#a259ff] font-semibold">
+                  <span className="text-gray-500">Category</span>
+                  <span className="text-[var(--color-primary-dark)] font-medium">
                     {typeof product.category === 'object' ? product.category.name : product.category}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Origin</span>
-                  <span className="text-white">{product.origin}</span>
+                  <span className="text-gray-500">Origin</span>
+                  <span className="text-gray-900">{product.origin}</span>
                 </div>
               </div>
             </div>
 
             {/* Specifications */}
-            <div className="backdrop-blur-lg bg-black/60 rounded-xl p-6 border border-[#a259ff]/30 shadow-xl">
-              <h2 className="text-xl font-semibold bg-gradient-to-r from-white via-[#a259ff] to-white bg-clip-text text-transparent mb-4">
-                Specifications
-              </h2>
+            <div className="card-strong">
+              <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--color-primary-dark)' }}>Specifications</h2>
               <div className="space-y-3">
                 {Object.entries(product.specifications).map(([key, value]) => (
                   <div key={key} className="flex items-center justify-between">
-                    <span className="text-gray-400">{key}</span>
-                    <span className="text-white">{value}</span>
+                    <span className="text-gray-500">{key}</span>
+                    <span className="text-gray-900">{value}</span>
                   </div>
                 ))}
               </div>
@@ -215,15 +196,13 @@ export default function ProductDetail() {
 
             {/* Certifications */}
             {product.certifications.length > 0 && (
-              <div className="backdrop-blur-lg bg-black/60 rounded-xl p-6 border border-[#a259ff]/30 shadow-xl">
-                <h2 className="text-xl font-semibold bg-gradient-to-r from-white via-[#a259ff] to-white bg-clip-text text-transparent mb-4">
-                  Certifications
-                </h2>
+              <div className="card-strong">
+                <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--color-primary-dark)' }}>Certifications</h2>
                 <div className="flex flex-wrap gap-2">
                   {product.certifications.map((cert) => (
                     <span 
                       key={cert}
-                      className="px-3 py-1 bg-[#a259ff]/10 rounded-full text-sm text-[#a259ff] border border-[#a259ff]/40"
+                      className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700 border border-gray-200"
                     >
                       {cert}
                     </span>
@@ -234,15 +213,11 @@ export default function ProductDetail() {
 
             {/* Packaging Options */}
             {product.packagingOptions.length > 0 && (
-              <div className="backdrop-blur-lg bg-black/60 rounded-xl p-6 border border-[#a259ff]/30 shadow-xl">
-                <h2 className="text-xl font-semibold bg-gradient-to-r from-white via-[#a259ff] to-white bg-clip-text text-transparent mb-4">
-                  Packaging Options
-                </h2>
-                <div className="space-y-2">
+              <div className="card-strong">
+                <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--color-primary-dark)' }}>Packaging Options</h2>
+                <div className="space-y-2 text-gray-700">
                   {product.packagingOptions.map((option) => (
-                    <div key={option} className="text-gray-200">
-                      • {option}
-                    </div>
+                    <div key={option}>• {option}</div>
                   ))}
                 </div>
               </div>
@@ -252,7 +227,7 @@ export default function ProductDetail() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               onClick={() => setIsEnquiryModalOpen(true)}
-              className="w-full py-3 bg-[#a259ff] text-white rounded-xl hover:opacity-90 transition-all duration-300 shadow-lg hover:shadow-2xl font-bold uppercase tracking-widest text-lg mt-4"
+              className="w-full btn-primary mt-2"
             >
               Make an Inquiry
             </motion.button>
@@ -262,82 +237,70 @@ export default function ProductDetail() {
 
       {/* Inquiry Modal */}
       {isEnquiryModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-black/80 backdrop-blur-lg rounded-xl p-6 max-w-md w-full border border-[#a259ff]/40 shadow-2xl"
+            className="bg-white rounded-xl p-6 max-w-md w-full border border-gray-200 shadow-xl"
           >
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-white via-[#a259ff] to-white bg-clip-text text-transparent mb-6">
-              Product Inquiry
-            </h2>
+            <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--color-primary-dark)' }}>Product Inquiry</h2>
             <form onSubmit={handleInquirySubmit} className="space-y-4">
               <div>
-                <label className="block text-gray-300 mb-1">Name *</label>
+                <label className="block text-gray-700 mb-1">Name *</label>
                 <input
                   type="text"
                   name="name"
                   value={inquiryForm.name}
                   onChange={handleInquiryChange}
                   required
-                  className="w-full px-4 py-2 bg-black/60 text-white rounded-lg border border-[#a259ff]/30 focus:outline-none focus:border-[#a259ff]"
+                  className="input-field"
                 />
               </div>
               <div>
-                <label className="block text-gray-300 mb-1">Email *</label>
+                <label className="block text-gray-700 mb-1">Email *</label>
                 <input
                   type="email"
                   name="email"
                   value={inquiryForm.email}
                   onChange={handleInquiryChange}
                   required
-                  className="w-full px-4 py-2 bg-black/60 text-white rounded-lg border border-[#a259ff]/30 focus:outline-none focus:border-[#a259ff]"
+                  className="input-field"
                 />
               </div>
               <div>
-                <label className="block text-gray-300 mb-1">Phone</label>
+                <label className="block text-gray-700 mb-1">Phone</label>
                 <input
                   type="tel"
                   name="phone"
                   value={inquiryForm.phone}
                   onChange={handleInquiryChange}
-                  className="w-full px-4 py-2 bg-black/60 text-white rounded-lg border border-[#a259ff]/30 focus:outline-none focus:border-[#a259ff]"
+                  className="input-field"
                 />
               </div>
               <div>
-                <label className="block text-gray-300 mb-1">Company Name</label>
+                <label className="block text-gray-700 mb-1">Company Name</label>
                 <input
                   type="text"
                   name="companyName"
                   value={inquiryForm.companyName}
                   onChange={handleInquiryChange}
-                  className="w-full px-4 py-2 bg-black/60 text-white rounded-lg border border-[#a259ff]/30 focus:outline-none focus:border-[#a259ff]"
+                  className="input-field"
                 />
               </div>
               <div>
-                <label className="block text-gray-300 mb-1">Message *</label>
+                <label className="block text-gray-700 mb-1">Message *</label>
                 <textarea
                   name="message"
                   value={inquiryForm.message}
                   onChange={handleInquiryChange}
                   required
                   rows={4}
-                  className="w-full px-4 py-2 bg-black/60 text-white rounded-lg border border-[#a259ff]/30 focus:outline-none focus:border-[#a259ff]"
+                  className="input-field"
                 />
               </div>
               <div className="flex space-x-4 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setIsEnquiryModalOpen(false)}
-                  className="flex-1 px-4 py-2 bg-[#222] text-white rounded-lg hover:bg-[#333] transition-colors duration-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingInquiry}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-[#a259ff] to-[#7f3cff] text-white rounded-lg hover:from-[#b47aff] hover:to-[#a259ff] transition-all duration-300 disabled:opacity-50"
-                >
+                <button type="button" onClick={() => setIsEnquiryModalOpen(false)} className="flex-1 btn-ghost">Cancel</button>
+                <button type="submit" disabled={submittingInquiry} className="flex-1 btn-primary disabled:opacity-50">
                   {submittingInquiry ? 'Sending...' : 'Send Inquiry'}
                 </button>
               </div>

@@ -15,6 +15,15 @@ const sidebarVariants = {
   closed: { x: '-100%', width: '16rem' }
 };
 
+type MenuItem = {
+  path: string;
+  label: string;
+  icon: string;
+  description: string;
+  badge?: string;
+  comingSoon?: boolean;
+};
+
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -27,7 +36,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     navigate('/login');
   };
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
+    { path: '/admin/flow', label: 'Flow Overview', icon: '🧭', description: '5-Phase Export Workflow' },
+    { path: '/admin/flow/order-tracker', label: 'Order Tracker', icon: '📦', description: 'Live Order Monitoring' },
+    { path: '/admin/flow/phase-1', label: 'Phase 1', icon: '1️⃣', description: 'Vendor → Host' },
+    { path: '/admin/flow/phase-2', label: 'Phase 2', icon: '2️⃣', description: 'Host → Port' },
+    { path: '/admin/flow/phase-3', label: 'Phase 3', icon: '3️⃣', description: 'Port → Port' },
+    { path: '/admin/flow/phase-4', label: 'Phase 4', icon: '4️⃣', description: 'Import Processing' },
+    { path: '/admin/flow/phase-5', label: 'Phase 5', icon: '5️⃣', description: 'Port → Client' },
     { path: '/admin/dashboard', label: 'Dashboard', icon: '📊', description: 'Overview & Analytics' },
     { path: '/admin/products', label: 'Products', icon: '📦', description: 'Manage Export Products' },
     { path: '/admin/categories', label: 'Categories', icon: '🏷️', description: 'Product Categories' },

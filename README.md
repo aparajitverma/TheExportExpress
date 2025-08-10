@@ -96,50 +96,50 @@ ExportExpress Pro
 ### Installation
 
 1. **Clone the repository**
-   ```bash
-   git clone https://github.com/PearlShadowww/TheExportExpress.git
-   cd TheExportExpress
-   ```
+	```bash
+	git clone https://github.com/PearlShadowww/TheExportExpress.git
+	cd TheExportExpress
+	```
 
 2. **Install dependencies for all components**
-   ```bash
-   # Backend
-   cd TheExportExpress-main/backend
-   npm install
+	```bash
+	# Backend
+	cd TheExportExpress-main/backend
+	npm install
 
-   # Frontend
-   cd ../frontend
-   npm install
+	# Frontend
+	cd ../frontend
+	npm install
 
-   # Desktop App
-   cd ../../desktop-app
-   npm install
+	# Desktop App
+	cd ../../desktop-app
+	npm install
 
-   # AI Engine
-   cd ../ai-engine
-   pip install -r requirements.txt
-   ```
+	# AI Engine
+	cd ../ai-engine
+	pip install -r requirements.txt
+	```
 
 3. **Set up environment variables**
-   ```bash
-   # Copy environment templates
-   cp .env.example .env
-   ```
+	```bash
+	# Copy environment templates
+	cp .env.example .env
+	```
 
 4. **Start the services**
-   ```bash
-   # Start backend
-   cd TheExportExpress-main/backend
-   npm run dev
+	```bash
+	# Start backend
+	cd TheExportExpress-main/backend
+	npm run dev
 
-   # Start frontend (in new terminal)
-   cd TheExportExpress-main/frontend
-   npm run dev
+	# Start frontend (in new terminal)
+	cd TheExportExpress-main/frontend
+	npm run dev
 
-   # Start AI engine (in new terminal)
-   cd ai-engine
-   python src/main.py
-   ```
+	# Start AI engine (in new terminal)
+	cd ai-engine
+	python src/main.py
+	```
 
 ## ⚙️ Configuration
 
@@ -169,22 +169,22 @@ REDIS_URL=redis://localhost:6379
 API_KEY=your_api_key
 ```
 
-### Database Setup
+ Database Setup
 
 1. **MongoDB**
-   ```bash
-   # Start MongoDB
-   mongod
+	```bash
+	# Start MongoDB
+	mongod
 
-   # Initialize database
-   node TheExportExpress-main/backend/src/scripts/seed-all.ts
-   ```
+	# Initialize database
+	node TheExportExpress-main/backend/src/scripts/seed-all.ts
+	```
 
 2. **Redis**
-   ```bash
-   # Start Redis
-   redis-server
-   ```
+	```bash
+	# Start Redis
+	redis-server
+	```
 
 ## 📖 Usage
 

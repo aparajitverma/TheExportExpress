@@ -6,12 +6,19 @@ import { Toaster } from 'react-hot-toast';
 
 // Components
 import Sidebar from './components/Sidebar';
+import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Orders from './pages/Orders';
 import Suppliers from './pages/Suppliers';
 import MarketIntelligence from './pages/MarketIntelligence';
 import Settings from './pages/Settings';
+import FlowOverview from './pages/FlowOverview';
+import Phase1 from './pages/Phase1';
+import Phase2 from './pages/Phase2';
+import Phase3 from './pages/Phase3';
+import Phase4 from './pages/Phase4';
+import Phase5 from './pages/Phase5';
 
 // Stores
 import { useAppStore } from './stores/appStore';
@@ -73,6 +80,13 @@ function AppContent() {
             
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/home" element={<Home />} />
+              <Route path="/flow" element={<FlowOverview />} />
+              <Route path="/phase-1" element={<Phase1 />} />
+              <Route path="/phase-2" element={<Phase2 />} />
+              <Route path="/phase-3" element={<Phase3 />} />
+              <Route path="/phase-4" element={<Phase4 />} />
+              <Route path="/phase-5" element={<Phase5 />} />
               <Route path="/products" element={<Products />} />
               <Route path="/orders" element={<Orders />} />
               <Route path="/suppliers" element={<Suppliers />} />

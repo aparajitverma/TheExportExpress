@@ -16,17 +16,13 @@ type NavLinkProps = {
 const NavLink: React.FC<NavLinkProps> = ({ to, isActive, children }) => (
   <Link
     to={to}
-    className={`relative px-4 py-2 transition-all duration-300 transform hover:scale-105 ${
-      isActive
-        ? 'text-purple-400 font-semibold'
-        : 'text-gray-300 hover:text-purple-400'
-    }`}
+    className={`relative px-3 py-2 text-700 hover:text-[var(--color-primary)] transition-colors ${isActive ? 'font-medium text-[var(--color-primary)]' : ''}`}
   >
     {children}
     {isActive && (
       <motion.div
         layoutId="navbar-indicator"
-        className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-purple-400 shadow-cosmic"
+        className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-primary)]"
         transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
       />
     )}
@@ -93,8 +89,8 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="fixed top-0 left-0 w-full z-50 nav-glass text-white shadow-cosmic font-cosmic uppercase tracking-widest text-sm font-medium transition-all duration-300">
-      <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-3">
+    <nav className="fixed top-0 left-0 w-full z-50 nav-glass font-cosmic text-sm">
+      <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
         {/* Logo */}
         <Logo className="py-1" />
 
@@ -102,7 +98,10 @@ export default function Navbar() {
         <div className="hidden sm:flex sm:items-center sm:gap-6">
           <NavLink to="/" isActive={isActive('/')}>Home</NavLink>
           <NavLink to="/products" isActive={isActive('/products')}>Products</NavLink>
-          <NavLink to="/about" isActive={isActive('/about')}>About Us</NavLink>
+          <NavLink to="/services" isActive={isActive('/services')}>Services</NavLink>
+          <NavLink to="/case-studies" isActive={isActive('/case-studies')}>Case Studies</NavLink>
+          <NavLink to="/compliance" isActive={isActive('/compliance')}>Compliance</NavLink>
+          <NavLink to="/about" isActive={isActive('/about')}>About</NavLink>
           <NavLink to="/contact-us" isActive={isActive('/contact-us')}>Contact Us</NavLink>
         </div>
 
@@ -110,17 +109,13 @@ export default function Navbar() {
         <div className="hidden sm:flex sm:items-center">
           <div className="flex items-center space-x-4">
             {/* Universal Search Button */}
-            <button
-              onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="p-3 rounded-full glass-base hover:bg-purple-500/20 hover:border-purple-400/40 transition-all duration-300 group transform hover:scale-110"
-              aria-label="Toggle search"
-            >
-              <i className="fas fa-search text-purple-400 group-hover:text-purple-300 transition-colors duration-300"></i>
+            <button onClick={() => setIsSearchOpen(!isSearchOpen)} className="p-2 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors" aria-label="Toggle search">
+              <i className="fas fa-search text-gray-600"></i>
             </button>
             {user && (
               <button
                 onClick={handleLogout}
-                className="px-6 py-2 rounded-full text-sm font-medium text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-400/50 hover:bg-red-500/10 transition-all duration-300 transform hover:scale-105"
+                className="px-4 py-2 rounded-md text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 transition-colors"
               >
                 <i className="fas fa-sign-out-alt mr-2"></i>
                 Logout
@@ -130,10 +125,7 @@ export default function Navbar() {
         </div>
 
         {/* Mobile Menu Button */}
-        <button
-          className="sm:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 transition-all duration-300"
-          onClick={() => setIsOpen(!isOpen)}
-        >
+        <button className="sm:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:bg-gray-100 transition-colors" onClick={() => setIsOpen(!isOpen)}>
           <span className="sr-only">Open main menu</span>
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
@@ -217,7 +209,10 @@ export default function Navbar() {
         <div className="px-6 pt-4 pb-6 space-y-2">
           <MobileNavLink to="/" isActive={isActive('/')}>Home</MobileNavLink>
           <MobileNavLink to="/products" isActive={isActive('/products')}>Products</MobileNavLink>
-          <MobileNavLink to="/about" isActive={isActive('/about')}>About Us</MobileNavLink>
+          <MobileNavLink to="/services" isActive={isActive('/services')}>Services</MobileNavLink>
+          <MobileNavLink to="/case-studies" isActive={isActive('/case-studies')}>Case Studies</MobileNavLink>
+          <MobileNavLink to="/compliance" isActive={isActive('/compliance')}>Compliance</MobileNavLink>
+          <MobileNavLink to="/about" isActive={isActive('/about')}>About</MobileNavLink>
           <MobileNavLink to="/contact-us" isActive={isActive('/contact-us')}>Contact Us</MobileNavLink>
           
           <div className="pt-4 border-t border-purple-500/20">

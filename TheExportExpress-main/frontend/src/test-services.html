@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Services Overview Section Test</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/framer-motion@10/dist/framer-motion.js"></script>
+    <script src="https://kit.fontawesome.com/your-fontawesome-kit.js" crossorigin="anonymous"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Include relevant animations from animations.css */
+        .services-card-3d {
+            position: relative;
+            transform-style: preserve-3d;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .services-card-3d:hover {
+            transform: rotateX(5deg) rotateY(5deg) scale(1.05) translateZ(50px);
+        }
+
+        .services-glassmorphism {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px) saturate(1.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .services-glassmorphism:hover {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.15),
+                0 0 40px rgba(99, 102, 241, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        }
+
+        .perspective-container {
+            perspective: 1000px;
+            perspective-origin: center center;
+        }
+
+        @keyframes serviceCardEntrance {
+            0% {
+                opacity: 0;
+                transform: translateY(60px) scale(0.8) rotateX(45deg);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1) rotateX(0deg);
+            }
+        }
+
+        .service-card-entrance {
+            animation: serviceCardEntrance 0.8s ease-out forwards;
+        }
+
+        .service-card-entrance:nth-child(1) { animation-delay: 0s; }
+        .service-card-entrance:nth-child(2) { animation-delay: 0.2s; }
+        .service-card-entrance:nth-child(3) { animation-delay: 0.4s; }
+        .service-card-entrance:nth-child(4) { animation-delay: 0.6s; }
+        .service-card-entrance:nth-child(5) { animation-delay: 0.8s; }
+        .service-card-entrance:nth-child(6) { animation-delay: 1.0s; }
+
+        @keyframes serviceIconMorph {
+            0%, 100% {
+                transform: scale(1) rotate(0deg);
+                filter: brightness(1);
+            }
+            25% {
+                transform: scale(1.1) rotate(-10deg);
+                filter: brightness(1.1);
+            }
+            50% {
+                transform: scale(1.2) rotate(10deg);
+                filter: brightness(1.2);
+            }
+            75% {
+                transform: scale(1.1) rotate(-5deg);
+                filter: brightness(1.1);
+            }
+        }
+
+        .service-icon-morph:hover {
+            animation: serviceIconMorph 0.6s ease-in-out;
+        }
+
+        /* Background pattern animations */
+        @keyframes documentsPattern {
+            0%, 100% {
+                transform: translateY(0) rotate(0deg) scale(1);
+            }
+            33% {
+                transform: translateY(-5px) rotate(5deg) scale(1.1);
+            }
+            66% {
+                transform: translateY(5px) rotate(-5deg) scale(1);
+            }
+        }
+
+        @keyframes logisticsPattern {
+            0%, 100% {
+                transform: translateX(0);
+                opacity: 0.3;
+            }
+            50% {
+                transform: translateX(20px);
+                opacity: 0.8;
+            }
+        }
+
+        @keyframes customsPattern {
+            0%, 100% {
+                transform: scale(1) rotate(0deg);
+            }
+            50% {
+                transform: scale(1.3) rotate(180deg);
+            }
+        }
+
+        @keyframes consultingPattern {
+            0%, 100% {
+                transform: translateY(0) rotate(0deg);
+            }
+            25% {
+                transform: translateY(-10px) rotate(15deg);
+            }
+            75% {
+                transform: translateY(0) rotate(-15deg);
+            }
+        }
+
+        @keyframes qualityPattern {
+            0%, 100% {
+                transform: scale(1) rotate(0deg);
+            }
+            20% {
+                transform: scale(1.2) rotate(72deg);
+            }
+            40% {
+                transform: scale(1) rotate(144deg);
+            }
+            60% {
+                transform: scale(1.2) rotate(216deg);
+            }
+            80% {
+                transform: scale(1) rotate(288deg);
+            }
+        }
+
+        @keyframes digitalPattern {
+            0%, 100% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const { motion } = Motion;
+
+        // Mock intersection observer hook for testing
+        const useAnimationTrigger = (options = {}) => {
+            const [hasTriggered, setHasTriggered] = useState(false);
+            const ref = useRef(null);
+
+            useEffect(() => {
+                // Simulate intersection after a short delay
+                const timer = setTimeout(() => {
+                    setHasTriggered(true);
+                }, 500);
+
+                return () => clearTimeout(timer);
+            }, []);
+
+            return [ref, hasTriggered];
+        };
+
+        const ServicesOverviewSection = () => {
+            const [sectionRef, isVisible] = useAnimationTrigger({
+                threshold: 0.2,
+                rootMargin: '-50px'
+            });
+
+            const [hoveredCard, setHoveredCard] = useState(null);
+            const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+            const serviceCategories = [
+                {
+                    id: 'export-documentation',
+                    title: 'Export Documentation',
+                    shortDescription: 'Complete documentation services for international trade',
+                    detailedDescription: 'Comprehensive export documentation services including certificates of origin, commercial invoices, packing lists, and all required customs paperwork to ensure smooth international transactions.',
+                    icon: 'fa-file-alt',
+                    features: ['Certificate of Origin', 'Commercial Invoices', 'Packing Lists', 'Customs Documentation'],
+                    color: 'from-blue-500 to-cyan-500',
+                    bgPattern: 'documents'
+                },
+                {
+                    id: 'logistics-coordination',
+                    title: 'Logistics Coordination',
+                    shortDescription: 'End-to-end logistics management and coordination',
+                    detailedDescription: 'Full-service logistics coordination including freight forwarding, shipping arrangements, cargo insurance, and real-time tracking to ensure your goods reach their destination safely and on time.',
+                    icon: 'fa-shipping-fast',
+                    features: ['Freight Forwarding', 'Shipping Arrangements', 'Cargo Insurance', 'Real-time Tracking'],
+                    color: 'from-green-500 to-emerald-500',
+                    bgPattern: 'logistics'
+                },
+                {
+                    id: 'customs-clearance',
+                    title: 'Customs Clearance',
+                    shortDescription: 'Expert customs clearance and compliance services',
+                    detailedDescription: 'Professional customs clearance services with expert knowledge of international trade regulations, duty calculations, and compliance requirements to prevent delays and ensure smooth border crossings.',
+                    icon: 'fa-shield-alt',
+                    features: ['Customs Brokerage', 'Duty Calculations', 'Compliance Checks', 'Border Clearance'],
+                    color: 'from-purple-500 to-violet-500',
+                    bgPattern: 'customs'
+                },
+                {
+                    id: 'trade-consulting',
+                    title: 'Trade Consulting',
+                    shortDescription: 'Strategic trade consulting and market analysis',
+                    detailedDescription: 'Expert trade consulting services including market analysis, regulatory guidance, trade route optimization, and strategic planning to help businesses expand their global reach effectively.',
+                    icon: 'fa-chart-line',
+                    features: ['Market Analysis', 'Regulatory Guidance', 'Route Optimization', 'Strategic Planning'],
+                    color: 'from-orange-500 to-red-500',
+                    bgPattern: 'consulting'
+                },
+                {
+                    id: 'quality-assurance',
+                    title: 'Quality Assurance',
+                    shortDescription: 'Comprehensive quality control and inspection services',
+                    detailedDescription: 'Rigorous quality assurance services including pre-shipment inspections, quality certifications, compliance testing, and detailed quality reports to ensure your products meet international standards.',
+                    icon: 'fa-award',
+                    features: ['Pre-shipment Inspections', 'Quality Certifications', 'Compliance Testing', 'Quality Reports'],
+                    color: 'from-teal-500 to-cyan-500',
+                    bgPattern: 'quality'
+                },
+                {
+                    id: 'digital-solutions',
+                    title: 'Digital Solutions',
+                    shortDescription: 'Advanced digital tools and platform integration',
+                    detailedDescription: 'Cutting-edge digital solutions including automated documentation, real-time tracking systems, digital compliance tools, and integrated platform solutions to streamline your export processes.',
+                    icon: 'fa-microchip',
+                    features: ['Automated Documentation', 'Real-time Tracking', 'Digital Compliance', 'Platform Integration'],
+                    color: 'from-indigo-500 to-purple-500',
+                    bgPattern: 'digital'
+                }
+            ];
+
+            const handleMouseMove = (e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setMousePosition({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                });
+            };
+
+            const containerVariants = {
+                hidden: { opacity: 0 },
+                visible: {
+                    opacity: 1,
+                    transition: {
+                        staggerChildren: 0.2,
+                        delayChildren: 0.3
+                    }
+                }
+            };
+
+            const cardVariants = {
+                hidden: { 
+                    opacity: 0, 
+                    y: 60,
+                    scale: 0.8,
+                    rotateX: 45
+                },
+                visible: {
+                    opacity: 1,
+                    y: 0,
+                    scale: 1,
+                    rotateX: 0,
+                    transition: {
+                        duration: 0.8,
+                        ease: "easeOut"
+                    }
+                }
+            };
+
+            const iconVariants = {
+                idle: { 
+                    scale: 1, 
+                    rotate: 0,
+                    filter: 'brightness(1)'
+                },
+                hover: { 
+                    scale: 1.2, 
+                    rotate: [0, -10, 10, 0],
+                    filter: 'brightness(1.2)',
+                    transition: {
+                        rotate: {
+                            duration: 0.6,
+                            ease: "easeInOut"
+                        },
+                        scale: {
+                            duration: 0.3,
+                            ease: "easeOut"
+                        }
+                    }
+                }
+            };
+
+            const backgroundPatterns = {
+                documents: (
+                    React.createElement('div', { className: "absolute inset-0 opacity-10" },
+                        [...Array(8)].map((_, i) =>
+                            React.createElement(motion.div, {
+                                key: i,
+                                className: "absolute w-4 h-6 bg-current rounded-sm",
+                                style: {
+                                    left: `${20 + (i % 3) * 30}%`,
+                                    top: `${20 + Math.floor(i / 3) * 25}%`,
+                                },
+                                animate: {
+                                    rotate: [0, 5, -5, 0],
+                                    scale: [1, 1.1, 1],
+                                },
+                                transition: {
+                                    duration: 3,
+                                    delay: i * 0.2,
+                                    repeat: Infinity,
+                                    ease: "easeInOut"
+                                }
+                            })
+                        )
+                    )
+                ),
+                logistics: (
+                    React.createElement('div', { className: "absolute inset-0 opacity-10" },
+                        [...Array(6)].map((_, i) =>
+                            React.createElement(motion.div, {
+                                key: i,
+                                className: "absolute w-8 h-4 bg-current rounded-full",
+                                style: {
+                                    left: `${15 + (i % 2) * 40}%`,
+                                    top: `${25 + Math.floor(i / 2) * 20}%`,
+                                },
+                                animate: {
+                                    x: [0, 20, 0],
+                                    opacity: [0.3, 0.8, 0.3],
+                                },
+                                transition: {
+                                    duration: 4,
+                                    delay: i * 0.3,
+                                    repeat: Infinity,
+                                    ease: "easeInOut"
+                                }
+                            })
+                        )
+                    )
+                ),
+                customs: (
+                    React.createElement('div', { className: "absolute inset-0 opacity-10" },
+                        [...Array(5)].map((_, i) =>
+                            React.createElement(motion.div, {
+                                key: i,
+                                className: "absolute w-6 h-6 border-2 border-current rounded-full",
+                                style: {
+                                    left: `${25 + (i % 3) * 25}%`,
+                                    top: `${30 + Math.floor(i / 3) * 30}%`,
+                                },
+                                animate: {
+                                    scale: [1, 1.3, 1],
+                                    rotate: [0, 180, 360],
+                                },
+                                transition: {
+                                    duration: 5,
+                                    delay: i * 0.4,
+                                    repeat: Infinity,
+                                    ease: "easeInOut"
+                                }
+                            })
+                        )
+                    )
+                ),
+                consulting: (
+                    React.createElement('div', { className: "absolute inset-0 opacity-10" },
+                        [...Array(4)].map((_, i) =>
+                            React.createElement(motion.div, {
+                                key: i,
+                                className: "absolute w-0 h-0 border-l-4 border-r-4 border-b-6 border-transparent border-b-current",
+                                style: {
+                                    left: `${30 + (i % 2) * 30}%`,
+                                    top: `${35 + Math.floor(i / 2) * 25}%`,
+                                },
+                                animate: {
+                                    y: [0, -10, 0],
+                                    rotate: [0, 15, -15, 0],
+                                },
+                                transition: {
+                                    duration: 3.5,
+                                    delay: i * 0.5,
+                                    repeat: Infinity,
+                                    ease: "easeInOut"
+                                }
+                            })
+                        )
+                    )
+                ),
+                quality: (
+                    React.createElement('div', { className: "absolute inset-0 opacity-10" },
+                        [...Array(6)].map((_, i) =>
+                            React.createElement(motion.div, {
+                                key: i,
+                                className: "absolute w-5 h-5 bg-current",
+                                style: {
+                                    left: `${20 + (i % 3) * 30}%`,
+                                    top: `${25 + Math.floor(i / 3) * 30}%`,
+                                    clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+                                },
+                                animate: {
+                                    scale: [1, 1.2, 1],
+                                    rotate: [0, 72, 144, 216, 288, 360],
+                                },
+                                transition: {
+                                    duration: 6,
+                                    delay: i * 0.3,
+                                    repeat: Infinity,
+                                    ease: "easeInOut"
+                                }
+                            })
+                        )
+                    )
+                ),
+                digital: (
+                    React.createElement('div', { className: "absolute inset-0 opacity-10" },
+                        [...Array(12)].map((_, i) =>
+                            React.createElement(motion.div, {
+                                key: i,
+                                className: "absolute w-2 h-2 bg-current rounded-full",
+                                style: {
+                                    left: `${15 + (i % 4) * 20}%`,
+                                    top: `${20 + Math.floor(i / 4) * 20}%`,
+                                },
+                                animate: {
+                                    scale: [0, 1, 0],
+                                    opacity: [0, 1, 0],
+                                },
+                                transition: {
+                                    duration: 2,
+                                    delay: i * 0.1,
+                                    repeat: Infinity,
+                                    ease: "easeInOut"
+                                }
+                            })
+                        )
+                    )
+                )
+            };
+
+            return React.createElement('section', {
+                ref: sectionRef,
+                className: "relative py-24 px-4 overflow-hidden",
+                onMouseMove: handleMouseMove
+            },
+                // Background
+                React.createElement('div', { className: "absolute inset-0 bg-gradient-to-br from-gray-50 via-white to-indigo-50/30" },
+                    // Interactive background
+                    React.createElement(motion.div, {
+                        className: "absolute inset-0 opacity-20",
+                        animate: {
+                            background: `radial-gradient(circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(99, 102, 241, 0.1) 0%, transparent 50%)`
+                        },
+                        transition: { duration: 0.3 }
+                    }),
+                    // Floating shapes
+                    React.createElement('div', { className: "absolute inset-0 opacity-10" },
+                        [...Array(8)].map((_, i) =>
+                            React.createElement(motion.div, {
+                                key: i,
+                                className: "absolute w-32 h-32 rounded-full blur-3xl",
+                                style: {
+                                    left: `${10 + (i % 4) * 25}%`,
+                                    top: `${10 + Math.floor(i / 4) * 40}%`,
+                                    background: `linear-gradient(135deg, ${
+                                        ['rgba(99, 102, 241, 0.3)', 'rgba(168, 85, 247, 0.3)', 'rgba(236, 72, 153, 0.3)', 'rgba(34, 197, 94, 0.3)'][i % 4]
+                                    }, transparent)`
+                                },
+                                animate: {
+                                    x: [0, 30, -30, 0],
+                                    y: [0, -20, 20, 0],
+                                    scale: [1, 1.2, 0.8, 1],
+                                },
+                                transition: {
+                                    duration: 15 + i * 2,
+                                    repeat: Infinity,
+                                    ease: "easeInOut"
+                                }
+                            })
+                        )
+                    )
+                ),
+
+                React.createElement('div', { className: "relative z-10 max-w-7xl mx-auto" },
+                    // Header
+                    React.createElement(motion.div, {
+                        initial: { opacity: 0, y: 30 },
+                        animate: isVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 },
+                        transition: { duration: 0.8 },
+                        className: "text-center mb-16"
+                    },
+                        React.createElement('h2', { 
+                            className: "text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-gray-900 via-indigo-800 to-gray-900 bg-clip-text text-transparent" 
+                        }, "Our Services Overview"),
+                        React.createElement('p', { 
+                            className: "text-xl text-gray-600 max-w-3xl mx-auto" 
+                        }, "Comprehensive export solutions tailored to your business needs, from documentation to delivery")
+                    ),
+
+                    // Services grid
+                    React.createElement(motion.div, {
+                        variants: containerVariants,
+                        initial: "hidden",
+                        animate: isVisible ? "visible" : "hidden",
+                        className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+                    },
+                        serviceCategories.map((service, index) =>
+                            React.createElement(motion.div, {
+                                key: service.id,
+                                variants: cardVariants,
+                                className: "group relative perspective-container",
+                                onMouseEnter: () => setHoveredCard(service.id),
+                                onMouseLeave: () => setHoveredCard(null)
+                            },
+                                React.createElement(motion.div, {
+                                    className: "relative h-full min-h-[400px] rounded-2xl overflow-hidden",
+                                    whileHover: { 
+                                        scale: 1.05,
+                                        rotateY: 5,
+                                        rotateX: 5,
+                                        z: 50
+                                    },
+                                    transition: { 
+                                        type: "spring", 
+                                        stiffness: 300, 
+                                        damping: 20 
+                                    }
+                                },
+                                    // Card background
+                                    React.createElement('div', { 
+                                        className: "absolute inset-0 bg-white/80 backdrop-blur-xl border border-white/30 rounded-2xl shadow-2xl group-hover:shadow-3xl transition-all duration-500" 
+                                    },
+                                        React.createElement('div', { 
+                                            className: `absolute inset-0 bg-gradient-to-br ${service.color} opacity-0 group-hover:opacity-10 transition-opacity duration-500 rounded-2xl` 
+                                        }),
+                                        React.createElement('div', { 
+                                            className: "absolute inset-0 text-gray-400 group-hover:text-current transition-colors duration-500" 
+                                        }, backgroundPatterns[service.bgPattern])
+                                    ),
+
+                                    // Card content
+                                    React.createElement('div', { className: "relative z-10 p-8 h-full flex flex-col" },
+                                        // Icon
+                                        React.createElement(motion.div, {
+                                            variants: iconVariants,
+                                            initial: "idle",
+                                            animate: hoveredCard === service.id ? "hover" : "idle",
+                                            className: "mb-6"
+                                        },
+                                            React.createElement('div', { 
+                                                className: `w-16 h-16 rounded-xl bg-gradient-to-br ${service.color} flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300` 
+                                            },
+                                                React.createElement('i', { 
+                                                    className: `fas ${service.icon} text-2xl text-white` 
+                                                })
+                                            )
+                                        ),
+
+                                        // Title
+                                        React.createElement('h3', { 
+                                            className: "text-2xl font-bold text-gray-900 mb-4 group-hover:text-gray-800 transition-colors duration-300" 
+                                        }, service.title),
+
+                                        // Short description
+                                        React.createElement('p', { 
+                                            className: "text-gray-600 mb-6 leading-relaxed" 
+                                        }, service.shortDescription),
+
+                                        // Detailed description (hover reveal)
+                                        React.createElement(motion.div, {
+                                            initial: { opacity: 0, height: 0 },
+                                            animate: hoveredCard === service.id 
+                                                ? { opacity: 1, height: 'auto' }
+                                                : { opacity: 0, height: 0 },
+                                            transition: { duration: 0.4, ease: "easeInOut" },
+                                            className: "overflow-hidden"
+                                        },
+                                            React.createElement('p', { 
+                                                className: "text-gray-700 mb-4 leading-relaxed text-sm" 
+                                            }, service.detailedDescription),
+                                            
+                                            React.createElement('div', { className: "space-y-2" },
+                                                React.createElement('h4', { 
+                                                    className: "font-semibold text-gray-800 text-sm" 
+                                                }, "Key Features:"),
+                                                React.createElement('ul', { className: "space-y-1" },
+                                                    service.features.map((feature, featureIndex) =>
+                                                        React.createElement(motion.li, {
+                                                            key: featureIndex,
+                                                            initial: { opacity: 0, x: -20 },
+                                                            animate: hoveredCard === service.id 
+                                                                ? { opacity: 1, x: 0 }
+                                                                : { opacity: 0, x: -20 },
+                                                            transition: { 
+                                                                duration: 0.3, 
+                                                                delay: featureIndex * 0.1 
+                                                            },
+                                                            className: "flex items-center text-sm text-gray-600"
+                                                        },
+                                                            React.createElement(motion.div, {
+                                                                className: `w-2 h-2 rounded-full bg-gradient-to-r ${service.color} mr-3 flex-shrink-0`,
+                                                                animate: hoveredCard === service.id 
+                                                                    ? { scale: [1, 1.3, 1] }
+                                                                    : { scale: 1 },
+                                                                transition: { 
+                                                                    duration: 0.5, 
+                                                                    delay: featureIndex * 0.1 
+                                                                }
+                                                            }),
+                                                            feature
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        ),
+
+                                        // Learn more button
+                                        React.createElement(motion.div, {
+                                            initial: { opacity: 0, y: 20 },
+                                            animate: hoveredCard === service.id 
+                                                ? { opacity: 1, y: 0 }
+                                                : { opacity: 0, y: 20 },
+                                            transition: { duration: 0.3, delay: 0.2 },
+                                            className: "mt-auto pt-4"
+                                        },
+                                            React.createElement('button', { 
+                                                className: `w-full py-3 px-6 rounded-xl bg-gradient-to-r ${service.color} text-white font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300` 
+                                            }, "Learn More")
+                                        )
+                                    ),
+
+                                    // Decorative corner
+                                    React.createElement('div', { 
+                                        className: `absolute top-0 right-0 w-20 h-20 bg-gradient-to-br ${service.color} opacity-10 group-hover:opacity-20 transition-opacity duration-500 rounded-2xl`,
+                                        style: { clipPath: 'polygon(100% 0%, 0% 0%, 100% 100%)' }
+                                    })
+                                )
+                            )
+                        )
+                    ),
+
+                    // Decorative dots
+                    React.createElement(motion.div, {
+                        initial: { opacity: 0, scale: 0 },
+                        animate: isVisible ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0 },
+                        transition: { duration: 1, delay: 1.5 },
+                        className: "flex justify-center mt-16"
+                    },
+                        React.createElement('div', { className: "flex space-x-3" },
+                            [...Array(6)].map((_, i) =>
+                                React.createElement(motion.div, {
+                                    key: i,
+                                    className: "w-3 h-3 rounded-full",
+                                    style: {
+                                        background: `linear-gradient(135deg, ${
+                                            ['#6366f1', '#8b5cf6', '#ec4899', '#22c55e', '#f59e0b', '#06b6d4'][i]
+                                        }, transparent)`
+                                    },
+                                    animate: {
+                                        scale: [1, 1.5, 1],
+                                        opacity: [0.5, 1, 0.5],
+                                    },
+                                    transition: {
+                                        duration: 2,
+                                        repeat: Infinity,
+                                        delay: i * 0.2,
+                                    }
+                                })
+                            )
+                        )
+                    )
+                )
+            );
+        };
+
+        ReactDOM.render(React.createElement(ServicesOverviewSection), document.getElementById('root'));
+    </script>
+</body>
+</html>
