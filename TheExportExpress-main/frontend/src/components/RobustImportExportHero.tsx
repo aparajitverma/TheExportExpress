@@ -241,24 +241,24 @@ export const RobustImportExportHero: React.FC<RobustImportExportHeroProps> = ({
                 <div className="relative h-32 flex items-center justify-center">
                   <div className="relative w-full h-full">
                     {/* Major Trade Hubs */}
-                    <div className="absolute w-3 h-3 border-2 border-black bg-white" style={{ left: '75%', top: '35%' }}>
+                    <div className="absolute w-3 h-3 border-2 border-black bg-white" style={{ left: '76%', top: '30%' }}>
                       <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-light whitespace-nowrap">ASIA</div>
                     </div>
                     
-                    <div className="absolute w-3 h-3 border-2 border-black bg-white" style={{ left: '45%', top: '25%' }}>
+                    <div className="absolute w-3 h-3 border-2 border-black bg-white" style={{ left: '45%', top: '30%' }}>
                       <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-light">EUROPE</div>
                     </div>
                     
-                    <div className="absolute w-3 h-3 border-2 border-black bg-white" style={{ left: '20%', top: '30%' }}>
-                      <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-light whitespace-nowrap">N.AMERICA</div>
+                    <div className="absolute w-3 h-3 border-2 border-black bg-white" style={{ left: '18%', top: '30%' }}>
+                      <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-light whitespace-nowrap">AMERICAS</div>
                     </div>
                     
                     {/* Connection lines */}
-                    <div className="absolute h-[1px] bg-black/40" style={{ left: '45%', top: '30%', width: '30%' }} />
+                    <div className="absolute h-[1px] bg-black/40" style={{ left: '47%', top: '35%', width: '30%' }} />
                     <div className="absolute h-[1px] bg-black/40" style={{ left: '20%', top: '35%', width: '25%' }} />
                     
                     {/* Shipping Indicators */}
-                    <div className="absolute text-xs font-light" style={{ left: '60%', top: '20%' }}>
+                    <div className="absolute text-xs font-light" style={{ left: '65%', top: '80%' }}>
                       ⚓ MAJOR PORTS
                     </div>
                     

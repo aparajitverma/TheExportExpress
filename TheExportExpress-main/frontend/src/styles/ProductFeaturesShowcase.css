@@ -1,0 +1,181 @@
+/* Product Features Showcase Styles */
+.product-features-showcase {
+  @apply w-full;
+}
+
+/* Header Styles */
+.product-features-showcase .header {
+  @apply text-center mb-8;
+}
+
+.product-features-showcase .title {
+  @apply text-2xl font-bold text-gray-900 mb-2;
+}
+
+.product-features-showcase .subtitle {
+  @apply text-gray-600 max-w-2xl mx-auto;
+}
+
+/* Category Filter */
+.product-features-showcase .category-filter {
+  @apply flex flex-wrap justify-center gap-2 mb-8;
+}
+
+.product-features-showcase .category-btn {
+  @apply px-4 py-2 rounded-full text-sm font-medium transition-all duration-200;
+}
+
+.product-features-showcase .category-btn.active {
+  @apply bg-blue-600 text-white shadow-lg;
+}
+
+.product-features-showcase .category-btn.inactive {
+  @apply bg-gray-100 text-gray-700 hover:bg-gray-200;
+}
+
+/* Feature Cards */
+.product-features-showcase .feature-card {
+  @apply bg-white rounded-xl border border-gray-200 overflow-hidden transition-all duration-200;
+}
+
+.product-features-showcase .feature-card.highlighted {
+  @apply ring-2 ring-blue-500 ring-opacity-50;
+}
+
+.product-features-showcase .feature-card:hover {
+  @apply shadow-xl transform -translate-y-1;
+}
+
+/* Feature Header */
+.product-features-showcase .feature-header {
+  @apply flex items-start space-x-4 mb-4;
+}
+
+.product-features-showcase .feature-icon {
+  @apply flex-shrink-0 p-3 rounded-lg transition-all duration-200;
+}
+
+.product-features-showcase .feature-icon.quality {
+  @apply bg-yellow-100 text-yellow-600;
+}
+
+.product-features-showcase .feature-icon.certification {
+  @apply bg-green-100 text-green-600;
+}
+
+.product-features-showcase .feature-icon.service {
+  @apply bg-blue-100 text-blue-600;
+}
+
+.product-features-showcase .feature-icon.sustainability {
+  @apply bg-emerald-100 text-emerald-600;
+}
+
+.product-features-showcase .feature-icon.innovation {
+  @apply bg-purple-100 text-purple-600;
+}
+
+.product-features-showcase .feature-title {
+  @apply text-lg font-semibold text-gray-900 mb-1;
+}
+
+.product-features-showcase .feature-description {
+  @apply text-gray-600 text-sm;
+}
+
+/* Benefits */
+.product-features-showcase .benefits-list {
+  @apply flex flex-wrap gap-2 mb-4;
+}
+
+.product-features-showcase .benefit-tag {
+  @apply inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700;
+}
+
+/* Progressive Disclosure */
+.product-features-showcase .learn-more-btn {
+  @apply flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors duration-200;
+}
+
+.product-features-showcase .detailed-description {
+  @apply mt-3 pt-3 border-t border-gray-100;
+}
+
+.product-features-showcase .detailed-text {
+  @apply text-gray-700 text-sm leading-relaxed;
+}
+
+/* Show More Button */
+.product-features-showcase .show-more-btn {
+  @apply px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium;
+}
+
+/* Layout Variants */
+.product-features-showcase .grid-layout {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6;
+}
+
+.product-features-showcase .masonry-layout {
+  @apply columns-1 md:columns-2 lg:columns-3 gap-6;
+}
+
+.product-features-showcase .carousel-layout {
+  @apply flex overflow-x-auto gap-6 pb-4;
+}
+
+.product-features-showcase .carousel-card {
+  @apply flex-shrink-0 w-80;
+}
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+  .product-features-showcase .grid-layout {
+    @apply grid-cols-1;
+  }
+  
+  .product-features-showcase .masonry-layout {
+    @apply columns-1;
+  }
+  
+  .product-features-showcase .category-filter {
+    @apply gap-1;
+  }
+  
+  .product-features-showcase .category-btn {
+    @apply px-3 py-1 text-xs;
+  }
+  
+  .product-features-showcase .feature-header {
+    @apply space-x-3;
+  }
+  
+  .product-features-showcase .feature-icon {
+    @apply p-2;
+  }
+  
+  .product-features-showcase .feature-title {
+    @apply text-base;
+  }
+}
+
+/* Accessibility */
+.product-features-showcase .feature-card:focus-within {
+  @apply ring-2 ring-blue-500 ring-offset-2;
+}
+
+.product-features-showcase .learn-more-btn:focus {
+  @apply outline-none ring-2 ring-blue-500 ring-offset-2 rounded;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .product-features-showcase .feature-card,
+  .product-features-showcase .feature-icon,
+  .product-features-showcase .learn-more-btn {
+    transition: none;
+  }
+  
+  .product-features-showcase .feature-card:hover {
+    transform: none;
+  }
+}

@@ -7,6 +7,7 @@ import Footer from './components/Footer';
 import Home from './pages/Home';
 import Products from './pages/Products';
 import ProductDetail from './pages/ProductDetail';
+import ProductPage from './pages/ProductPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import AboutPage from './pages/About';
@@ -14,6 +15,7 @@ import ContactUs from './pages/ContactUs';
 import AdminDashboard from './pages/admin/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { UserRole } from './types/user';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminProducts from './pages/admin/Products';
@@ -65,6 +67,7 @@ function AppContent() {
               <Route path="/" element={<Home />} />
               <Route path="/products" element={<Products />} />
               <Route path="/products/:id" element={<ProductDetail />} />
+              <Route path="/product/:id" element={<ProductPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/about" element={<AboutPage />} />
@@ -73,6 +76,7 @@ function AppContent() {
               <Route path="/compliance" element={<Compliance />} />
               <Route path="/contact-us" element={<ContactUs />} />
               <Route path="/test" element={<TestConnection />} />
+
               
               {/* Customer Dashboard - REMOVED */}
               {/* <Route

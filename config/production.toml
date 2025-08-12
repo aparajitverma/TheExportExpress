@@ -1,0 +1,28 @@
+[database]
+# Production MongoDB URI should be set via environment variable
+# EXPORT_MASTER_DATABASE_MONGODB_URI
+database_name = "export_master_pro"
+connection_timeout = 30
+max_pool_size = 20
+
+[redis]
+# Production Redis URI should be set via environment variable
+# EXPORT_MASTER_REDIS_REDIS_URI
+connection_timeout = 10
+max_connections = 20
+
+[security]
+# Production keys should be set via environment variables
+# EXPORT_MASTER_SECURITY_ENCRYPTION_KEY
+# EXPORT_MASTER_SECURITY_SALT
+session_timeout = 43200  # 12 hours
+
+[logging]
+level = "warn"
+max_file_size = 52428800  # 50MB
+max_files = 10
+
+[backup]
+backup_interval_hours = 6
+max_backup_files = 60
+compression_enabled = true

@@ -1,0 +1,204 @@
+/* Product Info Tabs Styles */
+.product-info-tabs {
+  @apply w-full;
+}
+
+/* Tab Navigation Styles */
+.product-info-tabs .tab-navigation {
+  @apply relative;
+}
+
+.product-info-tabs .tab-list {
+  @apply flex space-x-1 border-b border-gray-200 bg-white overflow-x-auto scrollbar-hide;
+}
+
+.product-info-tabs .tab-button {
+  @apply relative px-6 py-3 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-t-lg whitespace-nowrap;
+}
+
+.product-info-tabs .tab-button:hover {
+  @apply transform -translate-y-0.5;
+}
+
+.product-info-tabs .tab-button.active {
+  @apply text-gray-900 bg-white shadow-sm;
+}
+
+.product-info-tabs .tab-button.inactive {
+  @apply text-gray-600 bg-gray-50;
+}
+
+.product-info-tabs .tab-button.inactive:hover {
+  @apply text-gray-800 bg-gray-100;
+}
+
+/* Tab Indicator */
+.product-info-tabs .tab-indicator {
+  @apply absolute bottom-0 h-0.5 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Tab Content Styles */
+.product-info-tabs .tab-content {
+  @apply mt-6 min-h-[200px];
+}
+
+/* Specification Grid */
+.product-info-tabs .spec-grid {
+  @apply grid grid-cols-1 md:grid-cols-2 gap-4;
+}
+
+.product-info-tabs .spec-item {
+  @apply bg-gray-50 p-4 rounded-lg transition-all duration-200;
+}
+
+.product-info-tabs .spec-item:hover {
+  @apply bg-gray-100 shadow-sm transform translate-y-[-1px];
+}
+
+.product-info-tabs .spec-label {
+  @apply text-sm font-medium text-gray-600 uppercase tracking-wide;
+}
+
+.product-info-tabs .spec-value {
+  @apply mt-1 text-gray-900 font-medium;
+}
+
+/* Certification Badges */
+.product-info-tabs .cert-grid {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3;
+}
+
+.product-info-tabs .cert-badge {
+  @apply bg-green-50 border border-green-200 p-3 rounded-lg text-center transition-all duration-200;
+}
+
+.product-info-tabs .cert-badge:hover {
+  @apply bg-green-100 border-green-300 shadow-sm transform scale-105;
+}
+
+/* Packaging Options */
+.product-info-tabs .packaging-grid {
+  @apply grid grid-cols-1 sm:grid-cols-2 gap-4;
+}
+
+.product-info-tabs .packaging-item {
+  @apply bg-gray-50 border border-gray-200 p-4 rounded-lg transition-all duration-200;
+}
+
+.product-info-tabs .packaging-item:hover {
+  @apply shadow-md border-gray-300 transform translate-y-[-1px];
+}
+
+/* Origin Information */
+.product-info-tabs .origin-card {
+  @apply bg-blue-50 p-4 rounded-lg border border-blue-100;
+}
+
+.product-info-tabs .origin-label {
+  @apply text-blue-600 font-medium;
+}
+
+.product-info-tabs .origin-value {
+  @apply text-gray-900 font-semibold;
+}
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+  .product-info-tabs .tab-button {
+    @apply px-4 py-2 text-xs;
+  }
+  
+  .product-info-tabs .spec-grid {
+    @apply grid-cols-1;
+  }
+  
+  .product-info-tabs .cert-grid {
+    @apply grid-cols-1 sm:grid-cols-2;
+  }
+  
+  .product-info-tabs .packaging-grid {
+    @apply grid-cols-1;
+  }
+}
+
+/* Accessibility Enhancements */
+.product-info-tabs .tab-button:focus {
+  @apply ring-2 ring-blue-500 ring-offset-2;
+}
+
+.product-info-tabs .tab-content:focus {
+  @apply outline-none ring-2 ring-blue-500 ring-offset-2 rounded-lg;
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .product-info-tabs .tab-button,
+  .product-info-tabs .tab-indicator,
+  .product-info-tabs .spec-item,
+  .product-info-tabs .cert-badge,
+  .product-info-tabs .packaging-item {
+    transition: none;
+  }
+  
+  .product-info-tabs .tab-button:hover,
+  .product-info-tabs .spec-item:hover,
+  .product-info-tabs .cert-badge:hover,
+  .product-info-tabs .packaging-item:hover {
+    transform: none;
+  }
+}
+
+/* Scrollbar Hide Utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Loading States */
+.product-info-tabs .loading-skeleton {
+  @apply animate-pulse bg-gray-200 rounded;
+}
+
+.product-info-tabs .loading-text {
+  @apply h-4 bg-gray-200 rounded;
+}
+
+.product-info-tabs .loading-title {
+  @apply h-6 bg-gray-200 rounded;
+}
+
+/* Animation Keyframes */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.product-info-tabs .animate-fade-in-up {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.product-info-tabs .animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}

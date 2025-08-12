@@ -10,6 +10,12 @@
 /* Minimalistic monochrome design system */
 @import './styles/minimalist.css';
 
+/* Product page interactive redesign styles */
+@import './styles/product-page.css';
+
+/* Product image gallery styles */
+@import './styles/product-image-gallery.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

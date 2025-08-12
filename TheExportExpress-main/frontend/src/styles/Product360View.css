@@ -1,0 +1,163 @@
+/* Product 360 View Styles */
+.product-360-view {
+  @apply relative w-full h-full;
+}
+
+.product-360-view-empty {
+  @apply w-full h-full;
+}
+
+/* Container styles */
+.product-360-view-container {
+  min-height: 400px;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Image styles */
+.product-360-view img {
+  transition: opacity 0.1s ease-in-out;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Drag cursor states */
+.product-360-view [data-dragging="true"] {
+  cursor: grabbing !important;
+}
+
+.product-360-view [data-dragging="false"] {
+  cursor: grab;
+}
+
+/* Control buttons */
+.product-360-view button {
+  transition: all 0.2s ease-in-out;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.product-360-view button:hover {
+  transform: scale(1.05);
+}
+
+.product-360-view button:active {
+  transform: scale(0.95);
+}
+
+/* Progress indicator */
+.product-360-view .progress-container {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Loading animation */
+@keyframes spin360 {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.product-360-view .loading-spinner {
+  animation: spin360 1s linear infinite;
+}
+
+/* Touch feedback */
+.product-360-view:active {
+  transform: scale(0.999);
+}
+
+/* Focus styles for accessibility */
+.product-360-view:focus-within {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .product-360-view-container {
+    min-height: 300px;
+  }
+  
+  .product-360-view button {
+    padding: 8px;
+  }
+  
+  .product-360-view .progress-container {
+    padding: 8px;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .product-360-view button {
+    border: 2px solid currentColor;
+  }
+  
+  .product-360-view .progress-container {
+    border: 1px solid currentColor;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .product-360-view * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 360 View Toggle Button */
+.view-toggle-button {
+  @apply absolute top-4 left-4 flex flex-col items-center gap-1 p-2 rounded-lg;
+  @apply bg-white/80 text-gray-700 hover:bg-white backdrop-blur-sm;
+  @apply transition-all duration-200 ease-in-out;
+  @apply border border-gray-200/50;
+  z-index: 10;
+}
+
+.view-toggle-button.active {
+  @apply bg-blue-500 text-white border-blue-500;
+}
+
+.view-toggle-button:hover {
+  @apply scale-105 shadow-lg;
+}
+
+.view-toggle-button:active {
+  @apply scale-95;
+}
+
+.view-toggle-button span {
+  @apply font-medium;
+}
+
+/* Main image container states */
+.main-image-container.view-360-active {
+  @apply cursor-default;
+}
+
+.main-image-container.view-360-active .main-image-wrapper {
+  @apply h-full;
+}
+
+/* Print styles */
+@media print {
+  .product-360-view button {
+    display: none;
+  }
+  
+  .product-360-view .progress-container {
+    display: none;
+  }
+  
+  .view-toggle-button {
+    display: none;
+  }
+}

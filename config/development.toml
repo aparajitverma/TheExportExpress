@@ -1,0 +1,10 @@
+[database]
+mongodb_uri = "mongodb://localhost:27017"
+database_name = "export_master_pro_dev"
+
+[logging]
+level = "debug"
+
+[backup]
+backup_interval_hours = 1
+max_backup_files = 10
