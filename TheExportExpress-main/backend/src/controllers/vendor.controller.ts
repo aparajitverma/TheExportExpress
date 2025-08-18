@@ -151,14 +151,12 @@ export const createVendor = async (req: Request, res: Response) => {
     const vendor = new Vendor(vendorData);
     await vendor.save();
 
-    const populatedVendor = await Vendor.findById(vendor._id)
-      .populate('productCategories', 'name');
-
-    sendSuccess(res, { vendor: populatedVendor }, 'Vendor created successfully');
+    const populatedVendor = await Vendor.findById(vendor._id).populate('categories', 'name');
+    sendSuccess(res, { vendor: populatedVendor, message: 'Vendor created successfully' });
   } catch (error) {
     console.error('Error creating vendor:', error);
-    if (error.name === 'ValidationError') {
-      return sendError(res, 'Validation error: ' + error.message, 400);
+    if (error instanceof Error && 'name' in error && error.name === 'ValidationError') {
+      return sendError(res, `Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`, 400);
     }
     sendError(res, 'Failed to create vendor', 500);
   }
@@ -204,11 +202,11 @@ export const updateVendor = async (req: Request, res: Response) => {
       { new: true, runValidators: true }
     ).populate('productCategories', 'name');
 
-    sendSuccess(res, { vendor: updatedVendor }, 'Vendor updated successfully');
+    sendSuccess(res, { vendor: updatedVendor, message: 'Vendor updated successfully' });
   } catch (error) {
     console.error('Error updating vendor:', error);
-    if (error.name === 'ValidationError') {
-      return sendError(res, 'Validation error: ' + error.message, 400);
+    if (error instanceof Error && 'name' in error && error.name === 'ValidationError') {
+      return sendError(res, `Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`, 400);
     }
     sendError(res, 'Failed to update vendor', 500);
   }
@@ -233,8 +231,7 @@ export const deleteVendor = async (req: Request, res: Response) => {
     }
 
     await Vendor.findByIdAndDelete(id);
-
-    sendSuccess(res, null, 'Vendor deleted successfully');
+    sendSuccess(res, { message: 'Vendor deleted successfully' });
   } catch (error) {
     console.error('Error deleting vendor:', error);
     sendError(res, 'Failed to delete vendor', 500);
@@ -252,17 +249,11 @@ export const updateVendorStatus = async (req: Request, res: Response) => {
       return sendError(res, 'Invalid status', 400);
     }
 
-    const vendor = await Vendor.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true }
-    ).populate('productCategories', 'name');
-
+    const vendor = await Vendor.findByIdAndUpdate(id, { status }, { new: true });
     if (!vendor) {
       return sendError(res, 'Vendor not found', 404);
     }
-
-    sendSuccess(res, { vendor }, 'Vendor status updated successfully');
+    sendSuccess(res, { vendor, message: 'Vendor status updated successfully' });
   } catch (error) {
     console.error('Error updating vendor status:', error);
     sendError(res, 'Failed to update vendor status', 500);
@@ -275,20 +266,11 @@ export const verifyVendor = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { verified } = req.body;
 
-    const vendor = await Vendor.findByIdAndUpdate(
-      id,
-      { 
-        verified,
-        verificationDate: verified ? new Date() : null
-      },
-      { new: true }
-    ).populate('productCategories', 'name');
-
+    const vendor = await Vendor.findByIdAndUpdate(id, { verified }, { new: true });
     if (!vendor) {
       return sendError(res, 'Vendor not found', 404);
     }
-
-    sendSuccess(res, { vendor }, `Vendor ${verified ? 'verified' : 'unverified'} successfully`);
+    sendSuccess(res, { vendor, message: `Vendor ${verified ? 'verified' : 'unverified'} successfully` });
   } catch (error) {
     console.error('Error verifying vendor:', error);
     sendError(res, 'Failed to verify vendor', 500);
@@ -307,17 +289,11 @@ export const updateVendorMetrics = async (req: Request, res: Response) => {
     if (qualityScore !== undefined) updateData.qualityScore = Math.max(0, Math.min(100, qualityScore));
     if (deliveryScore !== undefined) updateData.deliveryScore = Math.max(0, Math.min(100, deliveryScore));
 
-    const vendor = await Vendor.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true }
-    ).populate('productCategories', 'name');
-
+    const vendor = await Vendor.findByIdAndUpdate(id, updateData, { new: true });
     if (!vendor) {
       return sendError(res, 'Vendor not found', 404);
     }
-
-    sendSuccess(res, { vendor }, 'Vendor metrics updated successfully');
+    sendSuccess(res, { vendor, message: 'Vendor metrics updated successfully' });
   } catch (error) {
     console.error('Error updating vendor metrics:', error);
     sendError(res, 'Failed to update vendor metrics', 500);
@@ -470,7 +446,7 @@ export const getVendorTemplate = async (req: Request, res: Response) => {
 };
 
 // Update vendor performance metrics (for interconnected system)
-export const updateVendorMetrics = asyncHandler(async (req: Request, res: Response) => {
+export const updateVendorMetricsExternal = asyncHandler(async (req: Request, res: Response) => {
   const { vendorId } = req.params;
   const { action } = req.body;
 
@@ -505,8 +481,9 @@ export const updateVendorMetrics = asyncHandler(async (req: Request, res: Respon
       reliabilityScore: vendor.reliabilityScore,
       qualityScore: vendor.qualityScore,
       deliveryScore: vendor.deliveryScore
-    }
-  }, 'Vendor metrics updated successfully');
+    },
+    message: 'Vendor metrics updated successfully'
+  });
 });
 
 // Get vendor performance analytics
@@ -563,5 +540,5 @@ export const getVendorPerformance = asyncHandler(async (req: Request, res: Respo
     }
   };
 
-  sendSuccess(res, performance, 'Vendor performance data retrieved successfully');
+  sendSuccess(res, { performance, message: 'Vendor performance data retrieved successfully' });
 }); 

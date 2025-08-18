@@ -1,13 +1,48 @@
 import { Request, Response, NextFunction } from 'express';
-import { Category } from '../models/Category';
-import { Product } from '../models/Product';
-import { BadRequestError, NotFoundError } from '../utils/ApiError';
+import { Category, ICategory } from '../models/Category';
+import { Product, IProduct } from '../models/Product';
+import { BadRequestError } from '../utils/ApiError';
 import { sendSuccess } from '../utils/response';
 import { IUserDocument } from '../models/User';
 import slugify from 'slugify';
-import { Types } from 'mongoose';
-import * as csv from 'csv-parser';
+import csv from 'csv-parser';
 import * as fs from 'fs';
+import { Readable } from 'stream';
+import { Types, Document } from 'mongoose';
+
+interface CsvRow {
+  [key: string]: string;
+}
+
+// Extend the IUserDocument to include _id
+interface IUserDocumentWithId extends IUserDocument {
+  _id: Types.ObjectId;
+}
+
+interface ImportResult<T> {
+  message: string;
+  summary: {
+    total: number;
+    success: number;
+    errors: number;
+  };
+  results: T[];
+  errors: Array<{ row: CsvRow; error: string }>;
+}
+
+// Process CSV file and return parsed rows
+const parseCSV = async (filePath: string): Promise<CsvRow[]> => {
+  return new Promise((resolve, reject) => {
+    const rows: CsvRow[] = [];
+    const stream = fs.createReadStream(filePath);
+    
+    stream
+      .pipe(csv())
+      .on('data', (row: CsvRow) => rows.push(row))
+      .on('end', () => resolve(rows))
+      .on('error', (error) => reject(error));
+  });
+};
 
 // Bulk import categories from CSV
 export const bulkImportCategories = async (
@@ -15,105 +50,111 @@ export const bulkImportCategories = async (
   res: Response,
   next: NextFunction
 ) => {
+  if (!req.file) {
+    throw new BadRequestError('CSV file is required');
+  }
+
+  if (!req.file.mimetype.includes('csv') && !req.file.originalname.endsWith('.csv')) {
+    throw new BadRequestError('File must be a CSV');
+  }
+
+  const user = req.user as IUserDocumentWithId;
+  const results: ICategory[] = [];
+  const errors: Array<{ row: CsvRow; error: string }> = [];
+  let successCount = 0;
+  let errorCount = 0;
+
   try {
-    const user = req.user as IUserDocument;
+    // Parse CSV file
+    const rows = await parseCSV(req.file.path);
     
-    if (!req.file) {
-      throw new BadRequestError('CSV file is required');
-    }
-
-    if (!req.file.mimetype.includes('csv') && !req.file.originalname.endsWith('.csv')) {
-      throw new BadRequestError('File must be a CSV');
-    }
-
-    const results: any[] = [];
-    const errors: any[] = [];
-    let successCount = 0;
-    let errorCount = 0;
-
-    // Read CSV file
-    fs.createReadStream(req.file.path)
-      .pipe(csv())
-      .on('data', async (data) => {
-        try {
-          const { name, description, parentCategory } = data;
-          
-          if (!name || name.trim() === '') {
-            errors.push({ row: data, error: 'Category name is required' });
-            errorCount++;
-            return;
-          }
-
-          const slug = slugify(name, { lower: true, strict: true });
-          
-          // Check if category already exists
-          const existingCategory = await Category.findOne({ slug });
-          if (existingCategory) {
-            errors.push({ row: data, error: 'Category with this name already exists' });
-            errorCount++;
-            return;
-          }
-
-          const categoryData: any = {
-            name: name.trim(),
-            description: description ? description.trim() : '',
-            slug,
-            createdBy: user._id,
-            isActive: true
-          };
-
-          // Handle parent category if provided
-          if (parentCategory && parentCategory.trim() !== '') {
-            const parent = await Category.findOne({ 
-              $or: [
-                { name: parentCategory.trim() },
-                { slug: slugify(parentCategory.trim(), { lower: true, strict: true }) }
-              ]
-            });
-            
-            if (parent) {
-              categoryData.parentCategory = parent._id;
-            } else {
-              errors.push({ row: data, error: `Parent category "${parentCategory}" not found` });
-              errorCount++;
-              return;
-            }
-          }
-
-          const category = await Category.create(categoryData);
-          results.push(category);
-          successCount++;
-
-        } catch (error) {
-          errors.push({ row: data, error: error.message });
-          errorCount++;
-        }
-      })
-      .on('end', () => {
-        // Clean up uploaded file
-        fs.unlinkSync(req.file.path);
+    // Process each row sequentially
+    for (const row of rows) {
+      try {
+        const { name, description, parentCategory } = row;
         
-        sendSuccess(res, {
-          message: 'Bulk import completed',
-          summary: {
-            total: successCount + errorCount,
-            success: successCount,
-            errors: errorCount
-          },
-          results,
-          errors
-        });
-      })
-      .on('error', (error) => {
-        // Clean up uploaded file
-        if (fs.existsSync(req.file.path)) {
-          fs.unlinkSync(req.file.path);
+        if (!name?.trim()) {
+          errors.push({ row, error: 'Category name is required' });
+          errorCount++;
+          continue;
         }
-        next(new BadRequestError(`Error processing CSV: ${error.message}`));
-      });
+
+        const slug = slugify(name, { lower: true, strict: true });
+        
+        // Check if category already exists
+        const existingCategory = await Category.findOne({ slug });
+        if (existingCategory) {
+          errors.push({ row, error: 'Category with this name already exists' });
+          errorCount++;
+          continue;
+        }
+
+        // Create base category data
+        const baseCategoryData = {
+          name: name.trim(),
+          description: description?.trim() || '',
+          slug,
+          createdBy: user._id,
+          isActive: true
+        };
+
+        // Handle parent category if provided
+        if (parentCategory?.trim()) {
+          const parent = await Category.findOne({ 
+            $or: [
+              { name: parentCategory.trim() },
+              { slug: slugify(parentCategory.trim(), { lower: true, strict: true }) }
+            ]
+          });
+          
+          if (parent) {
+            // Create category with parent
+            const category = await Category.create({
+              ...baseCategoryData,
+              parentCategory: parent._id
+            });
+            results.push(category);
+          } else {
+            errors.push({ row, error: `Parent category "${parentCategory}" not found` });
+            errorCount++;
+            continue;
+          }
+        } else {
+          // Create category without parent
+          const category = await Category.create(baseCategoryData);
+          results.push(category);
+        }
+        successCount++;
+
+      } catch (error) {
+        errors.push({ 
+          row, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        });
+        errorCount++;
+      }
+    }
+
+    const result: ImportResult<ICategory> = {
+      message: 'Bulk import completed',
+      summary: {
+        total: successCount + errorCount,
+        success: successCount,
+        errors: errorCount
+      },
+      results,
+      errors
+    };
+
+    sendSuccess(res, result);
 
   } catch (error) {
     next(error);
+  } finally {
+    // Clean up uploaded file
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
   }
 };
 
@@ -123,138 +164,152 @@ export const bulkImportProducts = async (
   res: Response,
   next: NextFunction
 ) => {
+  if (!req.file) {
+    throw new BadRequestError('CSV file is required');
+  }
+
+  if (!req.file.mimetype.includes('csv') && !req.file.originalname.endsWith('.csv')) {
+    throw new BadRequestError('File must be a CSV');
+  }
+
+  const results: IProduct[] = [];
+  const errors: Array<{ row: CsvRow; error: string }> = [];
+  let successCount = 0;
+  let errorCount = 0;
+
   try {
-    const user = req.user as IUserDocument;
+    // Parse CSV file
+    const rows = await parseCSV(req.file.path);
     
-    if (!req.file) {
-      throw new BadRequestError('CSV file is required');
-    }
+    // Process each row sequentially
+    for (const row of rows) {
+      try {
+        const { 
+          name, 
+          description, 
+          shortDescription, 
+          category, 
+          origin, 
+          specifications,
+          certifications,
+          packagingOptions 
+        } = row;
+        
+        // Validate required fields
+        if (!name?.trim()) {
+          errors.push({ row, error: 'Product name is required' });
+          errorCount++;
+          continue;
+        }
 
-    if (!req.file.mimetype.includes('csv') && !req.file.originalname.endsWith('.csv')) {
-      throw new BadRequestError('File must be a CSV');
-    }
+        if (!description?.trim()) {
+          errors.push({ row, error: 'Product description is required' });
+          errorCount++;
+          continue;
+        }
 
-    const results: any[] = [];
-    const errors: any[] = [];
-    let successCount = 0;
-    let errorCount = 0;
+        if (!category?.trim()) {
+          errors.push({ row, error: 'Category is required' });
+          errorCount++;
+          continue;
+        }
 
-    // Read CSV file
-    fs.createReadStream(req.file.path)
-      .pipe(csv())
-      .on('data', async (data) => {
-        try {
-          const { 
-            name, 
-            description, 
-            shortDescription, 
-            category, 
-            origin, 
-            specifications,
-            certifications,
-            packagingOptions 
-          } = data;
-          
-          if (!name || name.trim() === '') {
-            errors.push({ row: data, error: 'Product name is required' });
-            errorCount++;
-            return;
-          }
+        // Find category by name or slug
+        const categoryDoc = await Category.findOne({
+          $or: [
+            { name: category.trim() },
+            { slug: slugify(category.trim(), { lower: true, strict: true }) }
+          ],
+          isActive: true
+        });
 
-          if (!description || description.trim() === '') {
-            errors.push({ row: data, error: 'Product description is required' });
-            errorCount++;
-            return;
-          }
+        if (!categoryDoc) {
+          errors.push({ row, error: `Category "${category}" not found` });
+          errorCount++;
+          continue;
+        }
 
-          if (!category || category.trim() === '') {
-            errors.push({ row: data, error: 'Category is required' });
-            errorCount++;
-            return;
-          }
-
-          // Find category by name or slug
-          const categoryDoc = await Category.findOne({
-            $or: [
-              { name: category.trim() },
-              { slug: slugify(category.trim(), { lower: true, strict: true }) }
-            ],
-            isActive: true
-          });
-
-          if (!categoryDoc) {
-            errors.push({ row: data, error: `Category "${category}" not found` });
-            errorCount++;
-            return;
-          }
-
-          // Parse specifications if provided
-          let parsedSpecifications = {};
-          if (specifications && specifications.trim() !== '') {
-            try {
-              parsedSpecifications = JSON.parse(specifications);
-            } catch (parseError) {
-              errors.push({ row: data, error: 'Invalid specifications JSON format' });
-              errorCount++;
-              return;
+        // Parse specifications into a plain object
+        let parsedSpecifications: Record<string, string> = {};
+        if (specifications) {
+          try {
+            const specs = JSON.parse(specifications);
+            if (typeof specs === 'object' && specs !== null) {
+              Object.entries(specs).forEach(([key, value]) => {
+                if (typeof value === 'string') {
+                  parsedSpecifications[key] = value;
+                }
+              });
             }
+          } catch (error) {
+            errors.push({ row, error: 'Invalid specifications format. Must be valid JSON.' });
+            errorCount++;
+            continue;
           }
+        }
 
-          // Parse certifications and packaging options
-          const parsedCertifications = certifications ? 
-            certifications.split(',').map((cert: string) => cert.trim()).filter(Boolean) : [];
+        // Parse certifications and packaging options
+        const parsedCertifications = certifications
+          ? certifications.split(',').map(cert => cert.trim()).filter(Boolean)
+          : [];
+        
+        const parsedPackagingOptions = packagingOptions
+          ? packagingOptions.split(',').map(opt => opt.trim()).filter(Boolean)
+          : [];
+
+        // Create product with proper typing according to IProduct interface
+        const productData = {
+          name: name.trim(),
+          description: description.trim(),
+          shortDescription: shortDescription?.trim() || description.trim().substring(0, 100),
+          category: categoryDoc._id,
+          origin: origin?.trim() || 'India',
+          specifications: parsedSpecifications,
+          certifications: parsedCertifications,
+          packagingOptions: parsedPackagingOptions,
+          images: [],
+          isActive: true
+        };
+
+        const product = await Product.create(productData);
+        const populatedProduct = await Product.findById(product._id)
+          .populate('category', 'name _id slug')
+          .lean();
           
-          const parsedPackagingOptions = packagingOptions ? 
-            packagingOptions.split(',').map((option: string) => option.trim()).filter(Boolean) : [];
-
-          const productData = {
-            name: name.trim(),
-            description: description.trim(),
-            shortDescription: shortDescription ? shortDescription.trim() : description.trim().substring(0, 100),
-            category: categoryDoc._id,
-            origin: origin ? origin.trim() : 'India',
-            specifications: parsedSpecifications,
-            certifications: parsedCertifications,
-            packagingOptions: parsedPackagingOptions,
-            images: [],
-            isActive: true
-          };
-
-          const product = await Product.create(productData);
-          const populatedProduct = await Product.findById(product._id).populate('category', 'name _id slug');
+        if (populatedProduct) {
           results.push(populatedProduct);
           successCount++;
+        }
 
-        } catch (error) {
-          errors.push({ row: data, error: error.message });
-          errorCount++;
-        }
-      })
-      .on('end', () => {
-        // Clean up uploaded file
-        fs.unlinkSync(req.file.path);
-        
-        sendSuccess(res, {
-          message: 'Bulk import completed',
-          summary: {
-            total: successCount + errorCount,
-            success: successCount,
-            errors: errorCount
-          },
-          results,
-          errors
+      } catch (error) {
+        errors.push({ 
+          row, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
         });
-      })
-      .on('error', (error) => {
-        // Clean up uploaded file
-        if (fs.existsSync(req.file.path)) {
-          fs.unlinkSync(req.file.path);
-        }
-        next(new BadRequestError(`Error processing CSV: ${error.message}`));
-      });
+        errorCount++;
+      }
+    }
+
+    const result: ImportResult<IProduct> = {
+      message: 'Bulk import completed',
+      summary: {
+        total: successCount + errorCount,
+        success: successCount,
+        errors: errorCount
+      },
+      results,
+      errors
+    };
+
+    sendSuccess(res, result);
 
   } catch (error) {
     next(error);
+  } finally {
+    // Clean up uploaded file
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
   }
 };
 

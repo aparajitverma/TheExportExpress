@@ -88,13 +88,22 @@ const seedDatabase = async () => {
     console.log(`${productsData.length} products seeded.`);
 
     console.log('Database seeding completed successfully!');
+    return true;
   } catch (error) {
     console.error('Error seeding database:', error);
     process.exit(1);
+    return false;
   } finally {
-    await mongoose.disconnect();
-    console.log('MongoDB connection closed.');
+    if (require.main === module) {
+      await mongoose.disconnect();
+      console.log('MongoDB connection closed.');
+      process.exit(0);
+    }
   }
 };
 
-seedDatabase(); 
+if (require.main === module) {
+  seedDatabase();
+}
+
+export { seedDatabase };

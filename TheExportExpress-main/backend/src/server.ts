@@ -123,9 +123,35 @@ const startServer = async (portIndex = 0) => {
 };
 
 // Connect to DB and start server
-connectDB().then(() => {
-  startServer();
-});
+const init = async () => {
+  try {
+    await connectDB();
+    
+    // Check if we should run the seed script
+    if (process.argv.includes('--seed') || process.env.NODE_ENV === 'development') {
+      try {
+        const { seedDatabase } = await import('./scripts/seed-all');
+        await seedDatabase();
+        console.log('Database seeding completed successfully!');
+      } catch (error) {
+        console.error('Error during seeding:', error);
+      }
+    }
+    
+    // Start the server
+    await startServer();
+  } catch (error) {
+    console.error('Failed to initialize application:', error);
+    process.exit(1);
+  }
+};
+
+// Only start the server if this file is run directly
+if (require.main === module) {
+  init();
+}
+
+export { connectDB, startServer };
 
 // Export constants for other modules if needed (alternative to process.env)
-export { MONGODB_URI, PORTS, JWT_SECRET_KEY }; 
+export { MONGODB_URI, PORTS, JWT_SECRET_KEY };

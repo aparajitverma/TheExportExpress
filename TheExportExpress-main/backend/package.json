@@ -10,7 +10,7 @@
     "test": "jest",
     "lint": "eslint . --ext .ts",
     "seed": "ts-node src/scripts/seed.ts",
-    "seed:all": "ts-node src/scripts/seed-all.ts",
+    "seed:all": "ts-node src/server.ts --seed",
     "seed:categories": "ts-node src/scripts/seedCategories.ts",
     "seed:admin": "ts-node src/scripts/seedAdmin.ts"
   },

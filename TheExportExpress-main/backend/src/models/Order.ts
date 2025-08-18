@@ -247,7 +247,8 @@ orderSchema.pre('save', async function(next) {
     const todayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const todayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
     
-    const count = await this.constructor.countDocuments({
+    const OrderModel = this.constructor as mongoose.Model<typeof this>;
+    const count = await OrderModel.countDocuments({
       createdAt: { $gte: todayStart, $lt: todayEnd }
     });
     
