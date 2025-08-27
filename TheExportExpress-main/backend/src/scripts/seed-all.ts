@@ -13,11 +13,11 @@ const seedDatabase = async () => {
     await mongoose.connect(MONGODB_URI);
     console.log('MongoDB connected successfully.');
 
-    // 1. Clear existing data
-    console.log('Clearing existing data...');
-    await Product.deleteMany({});
-    await Category.deleteMany({});
-    await User.deleteMany({});
+    // 1. Skip clearing existing data to preserve user data
+    console.log('Skipping data deletion to preserve existing data...');
+    // await Product.deleteMany({});
+    // await Category.deleteMany({});
+    // await User.deleteMany({});
     console.log('Data cleared.');
 
     // 2. Create Super Admin User

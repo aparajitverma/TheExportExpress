@@ -28,8 +28,8 @@ const seedDatabase = async () => {
     console.log('Connected to MongoDB');
 
     // Clear existing data
-    await User.deleteMany({});
-    await Product.deleteMany({});
+    // await User.deleteMany({});
+    // await Product.deleteMany({});
 
     // Create admin user
     const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD_SEED, 10);

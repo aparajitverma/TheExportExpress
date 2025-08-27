@@ -33,7 +33,10 @@ export default function Products() {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get<{ data: Product[] }>(`${apiUrlToUse}/api/products`);
+      const response = await axios.get<{ data: Product[], total: number }>(
+        `${apiUrlToUse}/api/products`,
+        { params: { limit: 'all' } } // Request all products
+      );
       setProducts(response.data.data || []);
     } catch (err) {
       console.error('Error fetching products:', err);
