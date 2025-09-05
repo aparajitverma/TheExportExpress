@@ -7,6 +7,10 @@ export interface IVendor {
   email: string;
   phone: string;
   website?: string;
+  // Computed fields (from server) for UI convenience
+  productCount?: number;
+  catalogsCount?: number;
+  certificatesCount?: number;
   
   // Address Information
   address: {
@@ -76,7 +80,28 @@ export interface IVendor {
     qualityCertificates: string[];
     bankDetails?: string;
     other: string[];
+    // Additional document types for uploads
+    certificates?: string[];
+    brochures?: string[];
+    catalogs?: string[];
   };
+  
+  // Initial Products - vendor-specific product catalog
+  initialProducts?: Array<{
+    name: string;
+    currentPrice?: number;
+    currency?: string;
+    unit?: string;
+    minimumOrderQuantity?: number;
+    leadTime?: number;
+    hscCode?: string;
+    additionalComment?: string;
+    packagingOptions?: Array<{
+      option: string;
+      pricePerOption?: number;
+    }>;
+    certificationFiles?: string[];
+  }>;
   
   // Notes & History
   notes?: string;

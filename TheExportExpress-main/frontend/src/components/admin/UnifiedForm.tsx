@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { 
   XMarkIcon, 
@@ -12,15 +12,18 @@ import {
 export interface FormField {
   name: string;
   label: string;
-  type: 'text' | 'email' | 'tel' | 'number' | 'select' | 'textarea' | 'checkbox' | 'array' | 'object';
+  type: 'text' | 'email' | 'tel' | 'number' | 'textarea' | 'select' | 'checkbox' | 'object' | 'array' | 'file';
   required?: boolean;
   placeholder?: string;
   options?: { value: string; label: string }[];
   validation?: (value: any) => string | null;
-  fields?: FormField[]; // For nested objects
-  arrayItemFields?: FormField[]; // For array items
-  gridCols?: 1 | 2 | 3; // Grid layout
-  section?: string; // Group fields into sections
+  section?: string;
+  gridCols?: number;
+  fields?: FormField[]; // For object type
+  arrayItemFields?: FormField[]; // For array type
+  accept?: string; // For file type
+  multiple?: boolean; // For file type
+  expandOnMultiple?: boolean; // For array type - expand to full width when multiple items
 }
 
 interface UnifiedFormProps {
@@ -45,36 +48,55 @@ export const UnifiedForm: React.FC<UnifiedFormProps> = ({
   const [formData, setFormData] = useState<any>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const didInitRef = useRef(false);
 
   useEffect(() => {
     setFormData(initialData);
-  }, [initialData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Initialize form data structure
+  // Initialize form data structure (run once per mount to avoid wiping user entries)
   useEffect(() => {
+    if (didInitRef.current) return;
+    const newData = { ...formData };
+    const getLocal = (obj: any, path: string) => path.split('.').reduce((cur, key) => cur?.[key], obj);
+    const setLocal = (obj: any, path: string, value: any) => {
+      const keys = path.split('.');
+      const lastKey = keys.pop()!;
+      const target = keys.reduce((cur, key) => {
+        if (!cur[key]) cur[key] = {};
+        return cur[key];
+      }, obj);
+      target[lastKey] = value;
+    };
+
     const initializeData = (fieldsArray: FormField[], parentPath = '') => {
       fieldsArray.forEach(field => {
         const fieldPath = parentPath ? `${parentPath}.${field.name}` : field.name;
-        
-        if (!getNestedValue(formData, fieldPath)) {
+        if (!getLocal(newData, fieldPath)) {
           if (field.type === 'array') {
-            setNestedValue(formData, fieldPath, []);
+            setLocal(newData, fieldPath, []);
           } else if (field.type === 'object' && field.fields) {
-            setNestedValue(formData, fieldPath, {});
+            setLocal(newData, fieldPath, {});
             initializeData(field.fields, fieldPath);
+          } else if (field.type === 'file') {
+            setLocal(newData, fieldPath, null);
           } else if (field.type === 'checkbox') {
-            setNestedValue(formData, fieldPath, false);
+            setLocal(newData, fieldPath, false);
           } else if (field.type === 'number') {
-            setNestedValue(formData, fieldPath, 0);
+            setLocal(newData, fieldPath, 0);
           } else {
-            setNestedValue(formData, fieldPath, '');
+            setLocal(newData, fieldPath, '');
           }
         }
       });
     };
 
     initializeData(fields);
-  }, [fields, formData]);
+    setFormData(newData);
+    didInitRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Helper functions for nested object manipulation
   const getNestedValue = (obj: any, path: string) => {
@@ -138,7 +160,7 @@ export const UnifiedForm: React.FC<UnifiedFormProps> = ({
 
       // Validate array items
       if (field.type === 'array' && field.arrayItemFields && Array.isArray(value)) {
-        value.forEach((item, index) => {
+        value.forEach((_, index) => {
           field.arrayItemFields!.forEach(itemField => {
             validateField(itemField, `${fieldPath}.${index}`);
           });
@@ -172,21 +194,20 @@ export const UnifiedForm: React.FC<UnifiedFormProps> = ({
   // Array field helpers
   const addArrayItem = (fieldPath: string, field: FormField) => {
     const currentArray = getNestedValue(formData, fieldPath) || [];
-    const newItem = field.arrayItemFields?.reduce((item, itemField) => {
+    const newItem: Record<string, any> = {};
+    (field.arrayItemFields || []).forEach(itemField => {
       if (itemField.type === 'object') {
-        item[itemField.name] = {};
+        newItem[itemField.name] = {};
       } else if (itemField.type === 'array') {
-        item[itemField.name] = [];
+        newItem[itemField.name] = [];
       } else if (itemField.type === 'checkbox') {
-        item[itemField.name] = false;
+        newItem[itemField.name] = false;
       } else if (itemField.type === 'number') {
-        item[itemField.name] = 0;
+        newItem[itemField.name] = 0;
       } else {
-        item[itemField.name] = '';
+        newItem[itemField.name] = '';
       }
-      return item;
-    }, {}) || {};
-    
+    });
     updateFormData(fieldPath, [...currentArray, newItem]);
   };
 
@@ -228,6 +249,41 @@ export const UnifiedForm: React.FC<UnifiedFormProps> = ({
               placeholder={field.placeholder}
               className={baseInputClasses}
             />
+            {error && (
+              <p className="mt-1 text-sm text-red-400 flex items-center">
+                <ExclamationTriangleIcon className="w-4 h-4 mr-1" />
+                {error}
+              </p>
+            )}
+          </div>
+        );
+
+      case 'file':
+        return (
+          <div key={fieldPath}>
+            <label htmlFor={fieldId} className="block text-sm font-medium text-gray-300 mb-2">
+              {field.label} {field.required && <span className="text-red-400">*</span>}
+            </label>
+            <div className="relative">
+              <input
+                id={fieldId}
+                type="file"
+                accept={field.accept}
+                multiple={field.multiple}
+                onChange={(e) => updateFormData(fieldPath, e.target.files)}
+                className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600/50 text-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+              />
+              {value && (value as FileList).length > 0 && (
+                <div className="mt-2 text-sm text-gray-400">
+                  {Array.from(value as FileList).map((file, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-800/30 px-2 py-1 rounded">
+                      <span>{file.name}</span>
+                      <span className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             {error && (
               <p className="mt-1 text-sm text-red-400 flex items-center">
                 <ExclamationTriangleIcon className="w-4 h-4 mr-1" />
@@ -348,7 +404,7 @@ export const UnifiedForm: React.FC<UnifiedFormProps> = ({
       case 'array':
         const arrayValue = value || [];
         return (
-          <div key={fieldPath} className="space-y-4">
+          <div key={fieldPath} className="space-y-4 col-span-full">
             <div className="flex items-center justify-between">
               <label className="block text-sm font-medium text-gray-300">
                 {field.label} {field.required && <span className="text-red-400">*</span>}
@@ -363,25 +419,27 @@ export const UnifiedForm: React.FC<UnifiedFormProps> = ({
               </button>
             </div>
             
-            {arrayValue.map((item: any, index: number) => (
-              <div key={index} className="bg-gray-800/30 border border-gray-700/50 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h5 className="text-sm font-medium text-gray-200">
-                    {field.label.slice(0, -1)} #{index + 1}
-                  </h5>
-                  <button
-                    type="button"
-                    onClick={() => removeArrayItem(fieldPath, index)}
-                    className="text-red-400 hover:text-red-300"
-                  >
-                    <TrashIcon className="w-4 h-4" />
-                  </button>
+            <div className={`grid gap-6 ${field.expandOnMultiple ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+              {arrayValue.map((_: any, index: number) => (
+                <div key={index} className="bg-gray-800/30 border border-gray-700/50 rounded-lg p-4 w-full">
+                  <div className="flex items-center justify-between mb-4">
+                    <h5 className="text-sm font-medium text-gray-200">
+                      {field.label.slice(0, -1)} #{index + 1}
+                    </h5>
+                    <button
+                      type="button"
+                      onClick={() => removeArrayItem(fieldPath, index)}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className={`grid gap-4 ${field.gridCols ? `grid-cols-${field.gridCols}` : 'grid-cols-1'}`}>
+                    {field.arrayItemFields?.map(itemField => renderField(itemField, fieldPath, index))}
+                  </div>
                 </div>
-                <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-                  {field.arrayItemFields?.map(itemField => renderField(itemField, fieldPath, index))}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
             
             {arrayValue.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-4 border-2 border-dashed border-gray-700 rounded-lg">

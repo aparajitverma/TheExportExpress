@@ -4,6 +4,7 @@ import { Category } from '../models/Category';
 import Order from '../models/Order';
 import { ApiError, asyncHandler } from '../utils/ApiError';
 import { sendSuccess, sendError } from '../utils/response';
+import { Product } from '../models/Product';
 
 // Get all vendors with pagination, filtering, and sorting
 export const getAllVendors = async (req: Request, res: Response) => {
@@ -80,14 +81,35 @@ export const getAllVendors = async (req: Request, res: Response) => {
       }
     ]);
 
+    // Compute product counts per vendor
+    const vendorIds = vendors.map(v => v._id);
+    let countsMap: Record<string, number> = {};
+    if (vendorIds.length > 0) {
+      const counts = await Product.aggregate([
+        { $match: { vendor: { $in: vendorIds } } },
+        { $group: { _id: '$vendor', count: { $sum: 1 } } },
+      ]);
+      countsMap = counts.reduce((acc: any, c: any) => {
+        acc[String(c._id)] = c.count;
+        return acc;
+      }, {});
+    }
+
+    const items = vendors.map(v => ({
+      ...v,
+      productCount: countsMap[String(v._id)] || 0,
+      catalogsCount: (v.documents as any)?.catalogs?.length || 0,
+      certificatesCount: v.documents?.qualityCertificates?.length || 0,
+    }));
+
+    // Unified response shape expected by AdminService.getList
     sendSuccess(res, {
-      vendors,
+      items,
       pagination: {
         currentPage: pageNum,
         totalPages,
-        totalVendors: total,
-        hasNextPage: pageNum < totalPages,
-        hasPrevPage: pageNum > 1
+        totalItems: total,
+        itemsPerPage: limitNum
       },
       stats: stats[0] || {
         totalVendors: 0,
@@ -111,8 +133,7 @@ export const getVendorById = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     const vendor = await Vendor.findById(id)
-      .populate('productCategories', 'name description')
-      .lean();
+      .populate('productCategories', 'name description');
 
     if (!vendor) {
       return sendError(res, 'Vendor not found', 404);
@@ -129,6 +150,9 @@ export const getVendorById = async (req: Request, res: Response) => {
 export const createVendor = async (req: Request, res: Response) => {
   try {
     const vendorData = req.body;
+    
+    // Debug: Log the incoming vendor data to see if initialProducts is included
+    console.log('Creating vendor with data:', JSON.stringify(vendorData, null, 2));
 
     // Generate vendor code if not provided
     if (!vendorData.vendorCode) {
@@ -148,15 +172,45 @@ export const createVendor = async (req: Request, res: Response) => {
       return sendError(res, 'Email already exists', 400);
     }
 
+    // Ensure initialProducts is properly structured before saving
+    if (vendorData.initialProducts && Array.isArray(vendorData.initialProducts)) {
+      console.log('Processing initialProducts:', vendorData.initialProducts.length, 'items');
+      // Validate and clean initialProducts data
+      vendorData.initialProducts = vendorData.initialProducts.map((product: any) => ({
+        name: product.name || '',
+        currentPrice: product.currentPrice ? Number(product.currentPrice) : undefined,
+        currency: product.currency || 'USD',
+        unit: product.unit || '',
+        minimumOrderQuantity: product.minimumOrderQuantity ? Number(product.minimumOrderQuantity) : undefined,
+        leadTime: product.leadTime ? Number(product.leadTime) : undefined,
+        hscCode: product.hscCode || '',
+        additionalComment: product.additionalComment || '',
+        packagingOptions: Array.isArray(product.packagingOptions) ? product.packagingOptions.map((opt: any) => ({
+          option: opt.option || opt.value || opt,
+          pricePerOption: opt.pricePerOption ? Number(opt.pricePerOption) : undefined
+        })) : [],
+        certificationFiles: Array.isArray(product.certificationFiles) ? product.certificationFiles : []
+      }));
+    }
+
     const vendor = new Vendor(vendorData);
     await vendor.save();
 
-    const populatedVendor = await Vendor.findById(vendor._id).populate('categories', 'name');
+    console.log('Vendor saved with initialProducts count:', vendor.initialProducts?.length || 0);
+
+    // Populate the correct path defined in schema: 'productCategories'
+    const populatedVendor = await Vendor.findById(vendor._id).populate('productCategories', 'name');
     sendSuccess(res, { vendor: populatedVendor, message: 'Vendor created successfully' });
   } catch (error) {
     console.error('Error creating vendor:', error);
+    // Handle Mongoose validation errors
     if (error instanceof Error && 'name' in error && error.name === 'ValidationError') {
       return sendError(res, `Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`, 400);
+    }
+    // Handle Mongo duplicate key errors gracefully (e.g., email or vendorCode uniqueness)
+    if ((error as any)?.code === 11000) {
+      const key = Object.keys((error as any).keyPattern || {})[0] || 'unique field';
+      return sendError(res, `${key} already exists`, 400);
     }
     sendError(res, 'Failed to create vendor', 500);
   }
@@ -196,13 +250,39 @@ export const updateVendor = async (req: Request, res: Response) => {
       }
     }
 
-    const updatedVendor = await Vendor.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true, runValidators: true }
-    ).populate('productCategories', 'name');
+    // Process initialProducts if present in update data
+    if (updateData.initialProducts && Array.isArray(updateData.initialProducts)) {
+      console.log('Updating vendor with initialProducts:', updateData.initialProducts.length, 'items');
+      // Validate and clean initialProducts data
+      updateData.initialProducts = updateData.initialProducts.map((product: any) => ({
+        name: product.name || '',
+        currentPrice: product.currentPrice ? Number(product.currentPrice) : undefined,
+        currency: product.currency || 'USD',
+        unit: product.unit || '',
+        minimumOrderQuantity: product.minimumOrderQuantity ? Number(product.minimumOrderQuantity) : undefined,
+        leadTime: product.leadTime ? Number(product.leadTime) : undefined,
+        hscCode: product.hscCode || '',
+        additionalComment: product.additionalComment || '',
+        packagingOptions: Array.isArray(product.packagingOptions) ? product.packagingOptions.map((opt: any) => ({
+          option: opt.option || opt.value || opt,
+          pricePerOption: opt.pricePerOption ? Number(opt.pricePerOption) : undefined
+        })) : [],
+        certificationFiles: Array.isArray(product.certificationFiles) ? product.certificationFiles : []
+      }));
+    }
 
-    sendSuccess(res, { vendor: updatedVendor, message: 'Vendor updated successfully' });
+    const vendor = await Vendor.findByIdAndUpdate(id, updateData, { 
+      new: true, 
+      runValidators: true 
+    }).populate('productCategories', 'name');
+
+    if (!vendor) {
+      return sendError(res, 'Vendor not found', 404);
+    }
+
+    console.log('Vendor updated with initialProducts count:', vendor.initialProducts?.length || 0);
+
+    sendSuccess(res, { vendor, message: 'Vendor updated successfully' });
   } catch (error) {
     console.error('Error updating vendor:', error);
     if (error instanceof Error && 'name' in error && error.name === 'ValidationError') {
@@ -444,6 +524,52 @@ export const getVendorTemplate = async (req: Request, res: Response) => {
     sendError(res, 'Failed to generate template', 500);
   }
 };
+
+// Upload and attach vendor documents (catalogs, brochures, certificates)
+export const uploadVendorDocuments = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const vendor = await Vendor.findById(id);
+  if (!vendor) {
+    throw new ApiError(404, 'Vendor not found');
+  }
+
+  // Handle new format with custom names
+  const files = req.files as any;
+  const body = req.body;
+  
+  const toPath = (f: Express.Multer.File) => `vendors/${f.filename}`;
+
+  // Initialize documents object if missing
+  vendor.documents = vendor.documents || ({} as any);
+
+  // Process 'other' documents (uncategorized)
+  const otherFiles = files?.other || [];
+  const otherNames = body?.other_names || [];
+  
+  if (otherFiles.length > 0) {
+    // Initialize other array if missing
+    if (!vendor.documents.other) {
+      vendor.documents.other = [];
+    }
+    
+    // Add new files to other documents with custom names if provided
+    const newFiles = otherFiles.map((file: Express.Multer.File, index: number) => {
+      const customName = Array.isArray(otherNames) ? otherNames[index] : otherNames;
+      const fileName = customName ? `${customName}_${file.filename}` : file.filename;
+      return `vendors/${fileName}`;
+    });
+    
+    vendor.documents.other = [
+      ...vendor.documents.other,
+      ...newFiles
+    ];
+  }
+
+  await vendor.save();
+
+  sendSuccess(res, { vendor, message: 'Documents uploaded successfully' });
+});
 
 // Update vendor performance metrics (for interconnected system)
 export const updateVendorMetricsExternal = asyncHandler(async (req: Request, res: Response) => {

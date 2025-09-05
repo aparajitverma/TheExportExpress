@@ -66,13 +66,15 @@ class AdminService {
   }
 
   // Generic API call method
-  private async apiCall<T>(
+  public async apiCall<T>(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
     endpoint: string,
     data?: any,
     showToast: boolean = true
   ): Promise<T> {
     try {
+      // Ensure we always use the latest auth token for every request
+      this.initializeAuth();
       const apiUrl = await this.getApiUrl();
       const config = {
         method,
@@ -82,14 +84,17 @@ class AdminService {
       };
 
       const response: AxiosResponse<ApiResponse<T>> = await axios(config);
-      
-      if (showToast && response.data.message) {
-        toast.success(response.data.message);
+
+      // Try to surface a success message if present either at top-level or nested in data
+      const successMsg = (response.data as any)?.message || (response.data as any)?.data?.message;
+      if (showToast && successMsg) {
+        toast.success(successMsg);
       }
-      
-      return response.data.data;
+
+      return response.data.data as any;
     } catch (error: any) {
-      const message = error.response?.data?.message || `Failed to ${method.toLowerCase()} ${endpoint}`;
+      const serverErr = error?.response?.data;
+      const message = serverErr?.message || serverErr?.error || `Failed to ${method.toLowerCase()} ${endpoint}`;
       if (showToast) {
         toast.error(message);
       }
@@ -148,6 +153,38 @@ class AdminService {
 
   public async getVendorPerformance(vendorId: string) {
     return this.apiCall('GET', `vendors/${vendorId}/performance`, undefined, false);
+  }
+
+  // Upload vendor documents (uncategorized with custom names)
+  public async uploadVendorDocuments(vendorId: string, documentsData: Array<{files: File[], name: string}>) {
+    try {
+      const apiUrl = await this.getApiUrl();
+      // Ensure auth headers are up-to-date
+      this.initializeAuth();
+
+      const form = new FormData();
+      
+      // Add all files to 'other' category with custom names
+      documentsData.forEach(docData => {
+        docData.files.forEach(file => {
+          form.append('other', file);
+          form.append('other_names', docData.name || file.name);
+        });
+      });
+
+      const res = await axios.patch(`${apiUrl}/api/vendors/${vendorId}/documents`, form, {
+        headers: {
+          ...this.authHeaders,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      if (res.data?.message) toast.success(res.data.message);
+      return res.data?.data;
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Failed to upload documents';
+      toast.error(message);
+      throw new Error(message);
+    }
   }
 
   // Orders with interconnected data

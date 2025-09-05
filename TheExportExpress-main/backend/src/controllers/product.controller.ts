@@ -11,7 +11,7 @@ export const createProduct = async (
   next: NextFunction
 ) => {
   try {
-    const { name, description, shortDescription, category, origin, certifications, packagingOptions } = req.body;
+    const { name, description, shortDescription, category, origin, certifications, packagingOptions, vendor, currentPrice, currency, unit, quantity, minimumOrderQuantity, leadTime, hscCode, additionalComment } = req.body;
     let specifications = {};
 
     // Parse specifications if it's a string
@@ -32,16 +32,8 @@ export const createProduct = async (
       images = (req.files as Express.Multer.File[]).map(file => `products/${file.filename}`);
     }
 
-    // Basic validation (can be expanded with a validation library)
-    if (!name || name.trim() === '' || 
-        !description || description.trim() === '' || 
-        !shortDescription || shortDescription.trim() === '' || 
-        !category || category.trim() === '' || // Assuming category is also a string that needs to be non-empty
-        !origin || origin.trim() === '') {
-      return next(new BadRequestError('Missing or empty required product fields: name, description, shortDescription, category, origin'));
-    }
-
-    const productData = {
+    // Create product with all fields including minimumOrderQuantity and leadTime
+    const productData: IProductCreate = {
       name,
       description,
       shortDescription,
@@ -51,12 +43,39 @@ export const createProduct = async (
       images,
       certifications: Array.isArray(certifications) ? certifications : (certifications ? [certifications] : []),
       packagingOptions: Array.isArray(packagingOptions) ? packagingOptions : (packagingOptions ? [packagingOptions] : []),
-      // shortDescription and isActive can be added if sent, or defaulted in model/here
+      vendor: vendor && mongoose.Types.ObjectId.isValid(vendor) ? vendor : undefined,
+      currentPrice: currentPrice ? Number(currentPrice) : undefined,
+      currency: currency || 'USD',
+      unit: unit || '',
+      quantity: quantity ? Number(quantity) : undefined,
+      minimumOrderQuantity: minimumOrderQuantity ? Number(minimumOrderQuantity) : undefined,
+      leadTime: leadTime ? Number(leadTime) : undefined,
     };
 
-    const product = await Product.create(productData);
-    // Populate category after creation to return the full object, or re-fetch
-    const populatedProduct = await Product.findById(product._id).populate('category', 'name _id slug');
+    // Validate required fields
+    if (!productData.name || !productData.category) {
+      return next(new BadRequestError('Name and category are required'));
+    }
+
+    // Validate numeric fields
+    if (productData.currentPrice !== undefined && (isNaN(productData.currentPrice) || productData.currentPrice < 0)) {
+      return next(new BadRequestError('Invalid currentPrice'));
+    }
+    if (productData.quantity !== undefined && (isNaN(productData.quantity) || productData.quantity < 0)) {
+      return next(new BadRequestError('Invalid quantity'));
+    }
+    if (productData.minimumOrderQuantity !== undefined && (isNaN(productData.minimumOrderQuantity) || productData.minimumOrderQuantity < 1)) {
+      return next(new BadRequestError('Invalid minimum order quantity'));
+    }
+    if (productData.leadTime !== undefined && (isNaN(productData.leadTime) || productData.leadTime < 1)) {
+      return next(new BadRequestError('Invalid lead time'));
+    }
+
+    const product = new Product(productData);
+    // Populate category and vendor after creation to return the full object, or re-fetch
+    const populatedProduct = await product.save().then((product) => Product.findById(product._id)
+      .populate('category', 'name _id slug')
+      .populate('vendor', 'companyName name _id vendorCode'));
     sendSuccess(res, populatedProduct, 201);
   } catch (error) {
     next(error);
@@ -76,7 +95,7 @@ export const updateProduct = async (
       throw new BadRequestError('Invalid product ID format');
     }
     
-    const { name, description, shortDescription, category, origin, certifications, packagingOptions } = req.body;
+    const { name, description, shortDescription, category, origin, certifications, packagingOptions, vendor, currentPrice, currency, unit, quantity, minimumOrderQuantity, leadTime, hscCode, additionalComment } = req.body;
     let specifications = {};
     let updatedImages: string[] | undefined = undefined;
 
@@ -117,6 +136,62 @@ export const updateProduct = async (
       packagingOptions: Array.isArray(packagingOptions) ? packagingOptions : (packagingOptions ? [packagingOptions] : existingProduct.packagingOptions),
     };
 
+    if (unit !== undefined) {
+      productData.unit = unit || '';
+    }
+    if (quantity !== undefined) {
+      const qNum = Number(quantity);
+      if (isNaN(qNum) || qNum < 0) {
+        return next(new BadRequestError('Invalid quantity'));
+      }
+      productData.quantity = qNum;
+    }
+    if (minimumOrderQuantity !== undefined) {
+      const moqNum = Number(minimumOrderQuantity);
+      if (isNaN(moqNum) || moqNum < 1) {
+        return next(new BadRequestError('Invalid minimum order quantity'));
+      }
+      productData.minimumOrderQuantity = moqNum;
+    }
+    if (leadTime !== undefined) {
+      const ltNum = Number(leadTime);
+      if (isNaN(ltNum) || ltNum < 1) {
+        return next(new BadRequestError('Invalid lead time'));
+      }
+      productData.leadTime = ltNum;
+    }
+    if (minimumOrderQuantity !== undefined) {
+      const moqNum = Number(minimumOrderQuantity);
+      if (isNaN(moqNum) || moqNum < 1) {
+        return next(new BadRequestError('Invalid minimum order quantity'));
+      }
+      productData.minimumOrderQuantity = moqNum;
+    }
+    if (leadTime !== undefined) {
+      const ltNum = Number(leadTime);
+      if (isNaN(ltNum) || ltNum < 1) {
+        return next(new BadRequestError('Invalid lead time'));
+      }
+      productData.leadTime = ltNum;
+    }
+
+    if (vendor && mongoose.Types.ObjectId.isValid(vendor)) {
+      productData.vendor = vendor;
+    }
+
+    if (currentPrice !== undefined) {
+      const priceNum = Number(currentPrice);
+      if (isNaN(priceNum) || priceNum < 0) {
+        return next(new BadRequestError('Invalid currentPrice'));
+      }
+      productData.currentPrice = priceNum;
+      productData.currency = currency || existingProduct.currency || 'USD';
+      // Append to price history
+      const history = existingProduct.priceHistory || [];
+      history.push({ amount: priceNum, currency: productData.currency, date: new Date() } as any);
+      productData.priceHistory = history;
+    }
+
     if (updatedImages) {
       productData.images = updatedImages;
       // TODO: Optionally delete old images from storage if they are replaced
@@ -126,7 +201,7 @@ export const updateProduct = async (
       id,
       { $set: productData },
       { new: true, runValidators: true }
-    ).populate('category', 'name _id slug'); // Populate after update
+    ).populate('category', 'name _id slug').populate('vendor', 'companyName name _id vendorCode'); // Populate after update
 
     if (!updatedProduct) {
       throw new NotFoundError('Product not found after update attempt');
@@ -173,6 +248,7 @@ export const listProducts = async (
     category?: string; // Assuming this is category ID for filtering
     search?: string;
     isActive?: string; // Allow filtering by isActive status
+    vendor?: string; // NEW: filter by vendor ID
   }>,
   res: Response,
   next: NextFunction
@@ -197,8 +273,23 @@ export const listProducts = async (
       query.category = req.query.category; 
     }
 
+    // NEW: filter by vendor
+    if (req.query.vendor) {
+      query.vendor = req.query.vendor;
+    }
+
     if (req.query.search) {
-      query.$text = { $search: req.query.search };
+      const search = (req.query.search || '').toString().trim();
+      if (search) {
+        // Regex-based, case-insensitive search across common fields
+        query.$or = [
+          { name: { $regex: search, $options: 'i' } },
+          { shortDescription: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+          // Include productCode if present in the schema
+          { productCode: { $regex: search, $options: 'i' } },
+        ];
+      }
     }
 
     const [products, total] = await Promise.all([

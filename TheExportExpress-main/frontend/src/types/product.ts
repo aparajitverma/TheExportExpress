@@ -28,12 +28,15 @@ export interface Product {
   name: string;
   description: string;
   shortDescription: string;
+  productCode?: string;
   // Category will now store the ID of the category document or the populated category object.
   // When sending data to backend for create/update, this should be the category ID (string).
   // When fetching data from backend, this might be a PopulatedCategory object.
   category: string | PopulatedCategory; 
   origin: string;
   images: string[];
+  price?: number | string;
+  unit?: string;
   specifications: Record<string, string>; 
   certifications: string[];
   packagingOptions: string[];

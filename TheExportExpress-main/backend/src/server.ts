@@ -14,6 +14,7 @@ import adminRoutes from './routes/admin.routes';
 import categoryRoutes from './routes/category.routes';
 import bulkRoutes from './routes/bulk.routes';
 import vendorRoutes from './routes/vendor.routes';
+import sampleDataRoutes from './routes/sampleData';
 import { errorHandler } from './middleware/error';
 import { auth } from './middleware/auth';
 
@@ -67,6 +68,7 @@ app.use('/api/uploads', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/bulk', bulkRoutes);
 app.use('/api/vendors', vendorRoutes);
+app.use('/api/sample-data', sampleDataRoutes);
 
 // 404 Not Found Handler
 app.use((req: Request, res: Response, next: NextFunction) => {

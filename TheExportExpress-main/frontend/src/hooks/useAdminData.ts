@@ -59,10 +59,12 @@ export function useAdminData<T>(
   // Initial load
   useEffect(() => {
     fetchData();
-    if (!stats) {
-      fetchStats();
-    }
-  }, [fetchData, fetchStats, stats]);
+  }, [fetchData]);
+
+  // Fetch stats separately on mount only
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   // CRUD operations
   const create = useCallback(async (itemData: any) => {

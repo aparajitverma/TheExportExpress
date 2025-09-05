@@ -13,6 +13,11 @@ const AdminProducts: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentApiUrl, setCurrentApiUrl] = useState(INITIAL_API_URL);
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [totalItems, setTotalItems] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(totalItems / limit));
   
   // Search and filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,34 +25,41 @@ const AdminProducts: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
+  // Debounced search to avoid fetching on every keystroke
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+
+  // Update debounced search term after a short delay
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // 500ms debounce
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
   useEffect(() => {
-    const initializeUrlAndFetch = async () => {
+    const initializeUrl = async () => {
       try {
         const apiUrl = await getApiUrl();
         setCurrentApiUrl(apiUrl);
-        fetchAdminProducts(apiUrl);
       } catch (e) {
         console.error("Error initializing API URL for Admin Products:", e);
         setError('Failed to initialize API settings. Please try again later.');
         setLoading(false);
       }
     };
-    initializeUrlAndFetch();
+    initializeUrl();
   }, []);
 
-  // Filter products based on search and filter criteria
+  // Fetch whenever pagination/search/status changes or API URL is ready
+  useEffect(() => {
+    if (!currentApiUrl) return;
+    fetchAdminProducts(currentApiUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentApiUrl, page, limit, debouncedSearchTerm, statusFilter]);
+
+  // Client-side filter for category only (search + status handled server-side)
   useEffect(() => {
     let filtered = products;
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.shortDescription?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.productCode?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
 
     // Category filter
     if (categoryFilter) {
@@ -57,23 +69,30 @@ const AdminProducts: React.FC = () => {
       });
     }
 
-    // Status filter
-    if (statusFilter) {
-      filtered = filtered.filter(product => {
-        if (statusFilter === 'active') return product.isActive;
-        if (statusFilter === 'inactive') return !product.isActive;
-        return true;
-      });
-    }
-
     setFilteredProducts(filtered);
-  }, [products, searchTerm, categoryFilter, statusFilter]);
+  }, [products, categoryFilter, statusFilter]);
 
   const fetchAdminProducts = async (apiUrlToUse: string) => {
     setLoading(true);
     try {
-      const response = await axios.get(`${apiUrlToUse}/api/products`);
+      const response = await axios.get(`${apiUrlToUse}/api/products`, {
+        params: {
+          // status filter mapping
+          isActive: statusFilter === 'active' ? 'true' : statusFilter === 'inactive' ? 'false' : 'all',
+          // server-side pagination and search
+          limit: String(limit),
+          page: String(page),
+          search: debouncedSearchTerm || undefined,
+        }
+      });
       setProducts(response.data.data || []);
+      const pagination = response.data.pagination;
+      if (pagination) {
+        setTotalItems(pagination.totalItems || 0);
+      } else {
+        // Fallback if pagination wrapper differs
+        setTotalItems((response.data.data || []).length);
+      }
       setError(null);
     } catch (err: any) {
       console.error('Error fetching products for admin:', err);
@@ -82,6 +101,30 @@ const AdminProducts: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handlers for pagination and filters
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setPage(1);
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // trigger immediate search without waiting for debounce
+      setDebouncedSearchTerm(searchTerm);
+    }
+  };
+
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setStatusFilter(e.target.value);
+    setPage(1);
+  };
+
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setCategoryFilter(e.target.value);
+    setPage(1);
   };
 
   const handleDeleteProduct = async (productId: string) => {
@@ -231,7 +274,8 @@ const AdminProducts: React.FC = () => {
                 type="text"
                 placeholder="Search by name, description, or code..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={handleSearchChange}
+                onKeyDown={handleSearchKeyDown}
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -241,7 +285,7 @@ const AdminProducts: React.FC = () => {
               <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
               <select
                 value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
+                onChange={handleCategoryChange}
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All Categories</option>
@@ -256,7 +300,7 @@ const AdminProducts: React.FC = () => {
               <label className="block text-sm font-medium text-gray-300 mb-2">Status</label>
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={handleStatusChange}
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All Status</option>
@@ -268,7 +312,7 @@ const AdminProducts: React.FC = () => {
             {/* Results Count */}
             <div className="flex items-end">
               <div className="text-sm text-gray-400">
-                Showing {filteredProducts.length} of {products.length} products
+                Showing page {page} of {totalPages} • {totalItems} total products
               </div>
             </div>
           </div>
@@ -492,6 +536,37 @@ const AdminProducts: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            {/* Pagination controls */}
+            <div className="flex items-center justify-between px-4 py-3 border-top border-gray-700 bg-gray-900/40">
+              <div className="text-sm text-gray-400">Items per page: 
+                <select
+                  className="ml-2 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-gray-200"
+                  value={limit}
+                  onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="px-3 py-1 rounded bg-gray-700 text-gray-200 disabled:opacity-50"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                >
+                  Previous
+                </button>
+                <span className="text-gray-300 text-sm">Page {page} of {totalPages}</span>
+                <button
+                  className="px-3 py-1 rounded bg-gray-700 text-gray-200 disabled:opacity-50"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </motion.div>
         )}
       </motion.div>
@@ -499,4 +574,4 @@ const AdminProducts: React.FC = () => {
   );
 };
 
-export default AdminProducts; 
+export default AdminProducts;

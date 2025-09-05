@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+// import { useNavigate } from 'react-router-dom';
+import AdminService from '../../services/AdminService';
 import {
   PlusIcon,
   MagnifyingGlassIcon,
@@ -156,36 +158,62 @@ const vendorFormFields: FormField[] = [
     ]
   },
   {
+    name: 'taxId',
+    label: 'Tax ID',
+    type: 'text',
+    required: true,
+    section: 'financial',
+    placeholder: 'Enter tax identification number'
+  },
+  {
     name: 'creditTerms',
     label: 'Credit Terms',
     type: 'textarea',
+    required: true,
     section: 'financial',
     placeholder: 'Describe credit terms and conditions'
   },
 
   // Product Information Section
   {
-    name: 'minimumOrderQuantity',
-    label: 'Minimum Order Quantity',
-    type: 'number',
-    required: true,
+    name: 'initialProducts',
+    label: 'Initial Products (Optional)',
+    type: 'array',
     section: 'products',
-    validation: (value) => value > 0 ? null : 'MOQ must be greater than 0'
-  },
-  {
-    name: 'leadTime',
-    label: 'Lead Time (days)',
-    type: 'number',
-    required: true,
-    section: 'products',
-    validation: (value) => value > 0 ? null : 'Lead time must be greater than 0'
-  },
-  {
-    name: 'samplePolicy',
-    label: 'Sample Policy',
-    type: 'textarea',
-    section: 'products',
-    placeholder: 'Describe sample availability and terms'
+    expandOnMultiple: true,
+    arrayItemFields: [
+      { name: 'name', label: 'Product Name', type: 'text', placeholder: 'Enter product name', required: true },
+      { name: 'currentPrice', label: 'Base Price', type: 'number', placeholder: 'e.g., 120.50' },
+      { name: 'currency', label: 'Currency', type: 'select', options: [
+        { value: 'USD', label: 'USD' },
+        { value: 'EUR', label: 'EUR' },
+        { value: 'GBP', label: 'GBP' },
+        { value: 'INR', label: 'INR' },
+        { value: 'CNY', label: 'CNY' },
+      ]},
+      { name: 'unit', label: 'Unit', type: 'text', placeholder: 'kg, piece, pack' },
+      { name: 'minimumOrderQuantity', label: 'Minimum Order Quantity', type: 'number', placeholder: 'e.g., 1000', validation: (value: number) => value > 0 ? null : 'MOQ must be greater than 0' },
+      { name: 'leadTime', label: 'Lead Time (days)', type: 'number', placeholder: 'e.g., 15', validation: (value: number) => value > 0 ? null : 'Lead time must be greater than 0' },
+      { name: 'hscCode', label: 'HSC Code', type: 'text', placeholder: 'e.g., 1234.56.78' },
+      { name: 'additionalComment', label: 'Additional Comment', type: 'textarea', placeholder: 'Any additional notes or comments about this product' },
+      {
+        name: 'packagingOptions',
+        label: 'Packaging Options & Pricing',
+        type: 'array',
+        gridCols: 2,
+        arrayItemFields: [
+          { name: 'option', label: 'Packaging Option', type: 'text', required: true, placeholder: 'e.g., Bulk, Retail Pack' },
+          { name: 'pricePerOption', label: 'Price Per Option', type: 'number', placeholder: 'Additional cost' }
+        ]
+      },
+      {
+        name: 'certificationFiles',
+        label: 'Certification Documents (PDF)',
+        type: 'file',
+        accept: 'application/pdf',
+        multiple: true
+      }
+    ]
   },
 
   // Performance Metrics Section
@@ -202,6 +230,21 @@ const vendorFormFields: FormField[] = [
     type: 'number',
     section: 'performance',
     validation: (value) => value >= 1 && value <= 100 ? null : 'Score must be between 1 and 100'
+  },
+
+  // Contact Information Section
+  {
+    name: 'primaryContact',
+    label: 'Primary Contact Information',
+    type: 'object',
+    section: 'contact',
+    gridCols: 2,
+    fields: [
+      { name: 'name', label: 'Contact Name', type: 'text', required: true },
+      { name: 'position', label: 'Position/Title', type: 'text', required: true },
+      { name: 'email', label: 'Contact Email', type: 'email', required: true },
+      { name: 'phone', label: 'Contact Phone', type: 'tel', required: true }
+    ]
   },
 
   // Additional Information
@@ -229,6 +272,24 @@ const vendorFormFields: FormField[] = [
     type: 'textarea',
     section: 'additional',
     placeholder: 'Additional notes about the vendor'
+  },
+
+  // Document Uploads Section
+  {
+    name: 'certificatesFiles',
+    label: 'Vendor Certificates (PDF)',
+    type: 'file',
+    section: 'documents',
+    accept: 'application/pdf',
+    multiple: true
+  },
+  {
+    name: 'brochureFiles',
+    label: 'Company Brochures (PDF)',
+    type: 'file',
+    section: 'documents',
+    accept: 'application/pdf',
+    multiple: true
   }
 ];
 
@@ -253,6 +314,7 @@ const Vendors: React.FC = () => {
     exportData,
     hasSelection,
     allSelected,
+    refresh,
   } = useVendors();
 
   const [showVendorForm, setShowVendorForm] = useState(false);
@@ -281,11 +343,95 @@ const Vendors: React.FC = () => {
 
   const handleFormSubmit = async (formData: any) => {
     if (formMode === 'create') {
-      await create(formData);
-    } else {
+      // Extract file fields but keep initialProducts in the vendor data
+      const { certificatesFiles, brochureFiles, ...vendorData } = formData;
+      
+      // Transform array fields to match backend expectations
+      if (vendorData.specialization && Array.isArray(vendorData.specialization)) {
+        vendorData.specialization = vendorData.specialization.map((item: any) => 
+          typeof item === 'object' && item.specialty ? item.specialty : item
+        );
+      }
+      
+      if (vendorData.tags && Array.isArray(vendorData.tags)) {
+        vendorData.tags = vendorData.tags.map((item: any) => 
+          typeof item === 'object' && item.tag ? item.tag : item
+        );
+      }
+      
+      // Transform initialProducts to match backend schema
+      if (vendorData.initialProducts && Array.isArray(vendorData.initialProducts)) {
+        vendorData.initialProducts = vendorData.initialProducts
+          .filter((ip: any) => {
+            // Skip empty rows
+            return Object.values(ip || {}).some((v: any) => v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0));
+          })
+          .map((ip: any) => ({
+            name: ip.name || '',
+            currentPrice: ip.currentPrice ? Number(ip.currentPrice) : undefined,
+            currency: ip.currency || 'USD',
+            unit: ip.unit || '',
+            minimumOrderQuantity: ip.minimumOrderQuantity ? Number(ip.minimumOrderQuantity) : undefined,
+            leadTime: ip.leadTime ? Number(ip.leadTime) : undefined,
+            hscCode: ip.hscCode || '',
+            additionalComment: ip.additionalComment || '',
+            packagingOptions: Array.isArray(ip.packagingOptions) ? ip.packagingOptions.map((p: any) => ({
+              option: p.option || p.value || p,
+              pricePerOption: p.pricePerOption ? Number(p.pricePerOption) : undefined
+            })) : [],
+            certificationFiles: Array.isArray(ip.certificationFiles) ? Array.from(ip.certificationFiles).map((file: any) => file.name || file) : []
+          }));
+      }
+      
+      // Handle file uploads for initialProducts certification documents
+      const productCertificationFiles: { [productIndex: number]: FileList } = {};
+      if (vendorData.initialProducts && Array.isArray(vendorData.initialProducts)) {
+        vendorData.initialProducts.forEach((product: any, index: number) => {
+          if (product.certificationFiles && (product.certificationFiles as FileList).length > 0) {
+            productCertificationFiles[index] = product.certificationFiles;
+            // Store file names in the product data for now
+            product.certificationFiles = Array.from(product.certificationFiles).map((file: any) => (file as File).name);
+          }
+        });
+      }
+
+      const created = await create(vendorData);
+      const createdVendor: any = (created as any)?.vendor || created; // normalize response shape
+      setShowVendorForm(false);
+      if (createdVendor) {
+        // Upload vendor-level documents
+        if (certificatesFiles && (certificatesFiles as any).length > 0) {
+          try {
+            await (await import('../../services/AdminService')).default.uploadVendorDocuments(createdVendor._id, { certificates: certificatesFiles });
+          } catch (e) {
+            console.warn('Failed to upload certificates at creation time:', e);
+          }
+        }
+        
+        if (brochureFiles && (brochureFiles as any).length > 0) {
+          try {
+            await (await import('../../services/AdminService')).default.uploadVendorDocuments(createdVendor._id, { brochures: brochureFiles });
+          } catch (e) {
+            console.warn('Failed to upload brochures at creation time:', e);
+          }
+        }
+
+        // Upload product certification files
+        for (const [productIndex, files] of Object.entries(productCertificationFiles)) {
+          try {
+            await (await import('../../services/AdminService')).default.uploadVendorDocuments(createdVendor._id, { certificates: files });
+          } catch (e) {
+            console.warn(`Failed to upload product certification files for product ${productIndex}:`, e);
+          }
+        }
+
+        // Initial products are now saved directly in the vendor document
+        // No need to create separate Product entities
+      }
+    } else if (formMode === 'edit') {
       await update(editingVendor!._id, formData);
+      setShowVendorForm(false);
     }
-    setShowVendorForm(false);
   };
 
   const handleDeleteVendor = async (vendorId: string) => {
@@ -319,8 +465,6 @@ const Vendors: React.FC = () => {
       default: return <ClockIcon className="w-4 h-4" />;
     }
   };
-
-
 
   return (
     <AdminLayout>
@@ -653,6 +797,7 @@ const Vendors: React.FC = () => {
           <VendorDetails
             vendor={selectedVendor}
             onClose={() => setShowVendorDetails(false)}
+            onDocumentsUploaded={() => refresh()}
           />
         )}
       </div>

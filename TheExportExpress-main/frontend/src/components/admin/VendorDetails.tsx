@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import { 
   XMarkIcon,
   BuildingOfficeIcon,
@@ -15,17 +16,18 @@ import {
   XCircleIcon,
   ClockIcon,
   CalendarIcon,
-  UsersIcon,
   TagIcon
 } from '@heroicons/react/24/outline';
 import { IVendor } from '../../types/vendor';
+import AdminService from '../../services/AdminService';
 
 interface VendorDetailsProps {
   vendor: IVendor;
   onClose: () => void;
+  onDocumentsUploaded?: () => void;
 }
 
-const VendorDetails: React.FC<VendorDetailsProps> = ({ vendor, onClose }) => {
+const VendorDetails: React.FC<VendorDetailsProps> = ({ vendor, onClose, onDocumentsUploaded }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'text-green-600 bg-green-100';
@@ -48,6 +50,64 @@ const VendorDetails: React.FC<VendorDetailsProps> = ({ vendor, onClose }) => {
 
   const getOverallScore = (vendor: IVendor) => {
     return Math.round((vendor.reliabilityScore + vendor.qualityScore + vendor.deliveryScore) / 3);
+  };
+
+  // Document upload handlers
+  const [documentSections, setDocumentSections] = React.useState([
+    { name: '', files: null as FileList | null }
+  ]);
+  const [uploading, setUploading] = React.useState(false);
+
+  const addDocumentSection = () => {
+    setDocumentSections([...documentSections, { name: '', files: null }]);
+  };
+
+  const removeDocumentSection = (index: number) => {
+    setDocumentSections(documentSections.filter((_, i) => i !== index));
+  };
+
+  const updateDocumentSection = (index: number, field: string, value: any) => {
+    const updated = [...documentSections];
+    updated[index] = { ...updated[index], [field]: value };
+    setDocumentSections(updated);
+  };
+
+  // Use vendor's own initialProducts array
+  const initialProducts = vendor.initialProducts || [];
+
+  const handleUpload = async () => {
+    try {
+      setUploading(true);
+      
+      // Filter sections that have files
+      const validSections = documentSections.filter(section => 
+        section.files && section.files.length > 0
+      );
+      
+      if (validSections.length === 0) {
+        alert('Please select files to upload.');
+        return;
+      }
+
+      // Collect all files with their names from all sections
+      const documentsData = validSections.map(section => ({
+        files: section.files ? Array.from(section.files) : [],
+        name: section.name || 'Untitled Document'
+      }));
+
+      await AdminService.uploadVendorDocuments(vendor._id, documentsData);
+      
+      // Reset form
+      setDocumentSections([
+        { name: '', files: null }
+      ]);
+      
+      onDocumentsUploaded && onDocumentsUploaded();
+    } catch (e) {
+      // toast handled inside service
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -293,6 +353,315 @@ const VendorDetails: React.FC<VendorDetailsProps> = ({ vendor, onClose }) => {
             </div>
           )}
 
+          {/* Initial Products */}
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Initial Products from this Vendor</h3>
+            {initialProducts.length === 0 ? (
+              <div className="text-sm text-gray-600">No initial products specified for this vendor.</div>
+            ) : (
+              <div className="space-y-4">
+                {initialProducts.map((p: any, index: number) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-base font-semibold text-gray-900">{p.name}</p>
+                      </div>
+                      <div className="text-right">
+                        {p.currentPrice !== undefined && (
+                          <p className="text-base font-semibold text-gray-900">
+                            {p.currentPrice} {p.currency || 'USD'}
+                          </p>
+                        )}
+                        {p.unit && (
+                          <p className="text-xs text-gray-600">Unit: {p.unit}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-800">
+                      {p.minimumOrderQuantity !== undefined && (
+                        <div><span className="text-gray-600">Minimum Order Quantity:</span> {p.minimumOrderQuantity}</div>
+                      )}
+                      {p.leadTime !== undefined && (
+                        <div><span className="text-gray-600">Lead Time:</span> {p.leadTime} days</div>
+                      )}
+                      {p.hscCode && (
+                        <div><span className="text-gray-600">HSC Code:</span> {p.hscCode}</div>
+                      )}
+                      {p.additionalComment && (
+                        <div className="md:col-span-2"><span className="text-gray-600">Comment:</span> {p.additionalComment}</div>
+                      )}
+                    </div>
+                    {Array.isArray(p.packagingOptions) && p.packagingOptions.length > 0 && (
+                      <div className="mt-3">
+                        <div className="text-sm font-medium text-gray-900 mb-1">Packaging Options</div>
+                        <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                          {p.packagingOptions?.map((option: any, optIndex: number) => (
+                            <li key={optIndex}>
+                              {option.option}: ${option.pricePerOption || 'N/A'}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {/* Product Certification Files */}
+                    {p.certificationFiles && p.certificationFiles.length > 0 && (
+                      <div>
+                        <span className="font-medium text-gray-700">Certification Files:</span>
+                        <div className="mt-1 space-y-1">
+                          {p.certificationFiles.map((file: string, fileIndex: number) => (
+                            <div key={fileIndex} className="flex items-center justify-between bg-gray-50 p-2 rounded text-sm">
+                              <span className="text-gray-600 truncate">{file.split('/').pop() || file}</span>
+                              <div className="flex gap-2">
+                                <a
+                                  href={`http://localhost:3000/uploads/${file}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-800 text-xs"
+                                >
+                                  View
+                                </a>
+                                <a
+                                  href={`http://localhost:3000/uploads/${file}`}
+                                  download
+                                  className="text-green-600 hover:text-green-800 text-xs"
+                                >
+                                  Download
+                                </a>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Existing Documents Display */}
+          {((vendor.documents?.certificates?.length || 0) > 0 || (vendor.documents?.brochures?.length || 0) > 0 || (vendor.documents?.catalogs?.length || 0) > 0 || (vendor.documents?.other?.length || 0) > 0) && (
+            <div className="mb-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Uploaded Documents</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Certificates */}
+                {(vendor.documents?.certificates?.length || 0) > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Certificates ({vendor.documents?.certificates?.length || 0})</h4>
+                    <div className="space-y-2">
+                      {(vendor.documents?.certificates || []).map((cert: string, index: number) => (
+                        <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                          <span className="text-sm text-gray-600 truncate">{cert.split('/').pop()}</span>
+                          <div className="flex gap-2">
+                            <a
+                              href={`http://localhost:3000/uploads/${cert}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 text-xs"
+                            >
+                              View
+                            </a>
+                            <a
+                              href={`http://localhost:3000/uploads/${cert}`}
+                              download
+                              className="text-green-600 hover:text-green-800 text-xs"
+                            >
+                              Download
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Brochures */}
+                {(vendor.documents?.brochures?.length || 0) > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Brochures ({vendor.documents?.brochures?.length || 0})</h4>
+                    <div className="space-y-2">
+                      {(vendor.documents?.brochures || []).map((brochure: string, index: number) => (
+                        <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                          <span className="text-sm text-gray-600 truncate">{brochure.split('/').pop()}</span>
+                          <div className="flex gap-2">
+                            <a
+                              href={`http://localhost:3000/uploads/${brochure}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 text-xs"
+                            >
+                              View
+                            </a>
+                            <a
+                              href={`http://localhost:3000/uploads/${brochure}`}
+                              download
+                              className="text-green-600 hover:text-green-800 text-xs"
+                            >
+                              Download
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Catalogs */}
+                {(vendor.documents?.catalogs?.length || 0) > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Catalogs ({vendor.documents?.catalogs?.length || 0})</h4>
+                    <div className="space-y-2">
+                      {(vendor.documents?.catalogs || []).map((catalog: string, index: number) => (
+                        <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                          <span className="text-sm text-gray-600 truncate">{catalog.split('/').pop()}</span>
+                          <div className="flex gap-2">
+                            <a
+                              href={`http://localhost:3000/uploads/${catalog}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 text-xs"
+                            >
+                              View
+                            </a>
+                            <a
+                              href={`http://localhost:3000/uploads/${catalog}`}
+                              download
+                              className="text-green-600 hover:text-green-800 text-xs"
+                            >
+                              Download
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Other Documents */}
+                {(vendor.documents?.other?.length || 0) > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Other Documents ({vendor.documents?.other?.length || 0})</h4>
+                    <div className="space-y-2">
+                      {(vendor.documents?.other || []).map((doc: string, index: number) => (
+                        <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                          <span className="text-sm text-gray-600 truncate">{doc.split('/').pop()}</span>
+                          <div className="flex gap-2">
+                            <a
+                              href={`http://localhost:3000/uploads/${doc}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 text-xs"
+                            >
+                              View
+                            </a>
+                            <a
+                              href={`http://localhost:3000/uploads/${doc}`}
+                              download
+                              className="text-green-600 hover:text-green-800 text-xs"
+                            >
+                              Download
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Document Uploads */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Upload New Documents</h3>
+              <button
+                onClick={addDocumentSection}
+                className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                + Add More Files
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {documentSections.map((section, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    {/* Document Name */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Document Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Enter document name or description"
+                        value={section.name}
+                        onChange={(e) => updateDocumentSection(index, 'name', e.target.value)}
+                        className="block w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    
+                    {/* File Upload */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Files (Multiple allowed)
+                      </label>
+                      <input
+                        type="file"
+                        multiple
+                        accept=".pdf,image/*"
+                        onChange={(e) => updateDocumentSection(index, 'files', e.target.files)}
+                        className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-white focus:outline-none"
+                      />
+                    </div>
+                    
+                    {/* Remove Button */}
+                    <div>
+                      {documentSections.length > 1 && (
+                        <button
+                          onClick={() => removeDocumentSection(index)}
+                          className="px-3 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* File Preview */}
+                  {section.files && section.files.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <p className="text-sm text-gray-600 mb-2">
+                        Selected files ({section.files.length}):
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {Array.from(section.files).map((file, fileIndex) => (
+                          <span
+                            key={fileIndex}
+                            className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded"
+                          >
+                            {file.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={handleUpload}
+                disabled={uploading}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {uploading ? 'Uploading...' : 'Upload All Documents'}
+              </button>
+            </div>
+          </div>
+
           {/* Timestamps */}
           <div className="border-t border-gray-200 pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
@@ -309,17 +678,28 @@ const VendorDetails: React.FC<VendorDetailsProps> = ({ vendor, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-4 p-6 border-t border-gray-200">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-          >
-            Close
-          </button>
+        <div className="flex justify-between items-center gap-4 p-6 border-t border-gray-200">
+          <div className="text-sm text-gray-600">
+            Tip: You can upload catalogs, brochures, and certificates above, or add products for this vendor.
+          </div>
+          <div className="flex items-center gap-3">
+            <Link
+              to={`/admin/products/new?vendorId=${vendor._id}`}
+              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Add Product for Vendor
+            </Link>
+            <button
+              onClick={onClose}
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </motion.div>
     </motion.div>
   );
 };
 
-export default VendorDetails; 
+export default VendorDetails;

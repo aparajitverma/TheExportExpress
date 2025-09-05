@@ -50,10 +50,31 @@ export interface IVendor extends Document {
   };
   
   // Product Information
-  productCategories: mongoose.Types.ObjectId[];
+  productCategories: Array<{
+    _id: string;
+    name: string;
+    description?: string;
+  }>;
   minimumOrderQuantity: number;
   leadTime: number; // in days
   samplePolicy: string;
+  
+  // Initial Products - vendor-specific product catalog
+  initialProducts: Array<{
+    name: string;
+    currentPrice?: number;
+    currency?: string;
+    unit?: string;
+    minimumOrderQuantity?: number;
+    leadTime?: number;
+    hscCode?: string;
+    additionalComment?: string;
+    packagingOptions?: Array<{
+      option: string;
+      pricePerOption?: number;
+    }>;
+    certificationFiles?: string[]; // file paths
+  }>;
   
   // Performance Metrics
   rating: number; // 1-5 stars
@@ -71,7 +92,10 @@ export interface IVendor extends Document {
     businessLicense: string;
     taxCertificate: string;
     qualityCertificates: string[];
+    certificates: string[];
     bankDetails: string;
+    catalogs?: string[];
+    brochures?: string[];
     other: string[];
   };
   
@@ -257,19 +281,71 @@ const vendorSchema = new Schema<IVendor>(
     }],
     minimumOrderQuantity: {
       type: Number,
-      required: true,
+      required: false,
       min: 1,
     },
     leadTime: {
       type: Number,
-      required: true,
+      required: false,
       min: 1,
     },
     samplePolicy: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
+    
+    // Initial Products - vendor-specific product catalog
+    initialProducts: [{
+      name: {
+        type: String,
+        required: false,
+        trim: true,
+      },
+      currentPrice: {
+        type: Number,
+        min: 0,
+      },
+      currency: {
+        type: String,
+        default: 'USD',
+      },
+      unit: {
+        type: String,
+        trim: true,
+      },
+      minimumOrderQuantity: {
+        type: Number,
+        min: 1,
+      },
+      leadTime: {
+        type: Number,
+        min: 1,
+      },
+      hscCode: {
+        type: String,
+        trim: true,
+      },
+      additionalComment: {
+        type: String,
+        trim: true,
+      },
+      packagingOptions: [{
+        option: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        pricePerOption: {
+          type: Number,
+          min: 0,
+        },
+      }],
+      certificationFiles: [{
+        type: String,
+        trim: true,
+      }],
+    }],
     
     // Performance Metrics
     rating: {
@@ -325,10 +401,22 @@ const vendorSchema = new Schema<IVendor>(
         type: String,
         trim: true,
       }],
+      certificates: [{
+        type: String,
+        trim: true,
+      }],
       bankDetails: {
         type: String,
         trim: true,
       },
+      catalogs: [{
+        type: String,
+        trim: true,
+      }],
+      brochures: [{
+        type: String,
+        trim: true,
+      }],
       other: [{
         type: String,
         trim: true,

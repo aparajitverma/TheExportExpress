@@ -5,11 +5,18 @@ import React, { useState, useEffect } from 'react';
 import { Product /*, ProductCategory */ } from '../../types/product'; // ProductCategory enum might be removed later or its usage changed
 import { getUploadsUrl, getApiUrl as fetchApiUrl } from '../../config'; // Renamed getApiUrl to avoid conflict if used as a variable
 import axios from 'axios'; // Re-adding axios as it will be used here to fetch categories
+import { useSearchParams } from 'react-router-dom';
+import { IVendor } from '../../types/vendor';
 
 // Interface for categories fetched for the dropdown
 interface CategoryOption {
   _id: string;
   name: string;
+}
+
+interface VendorOption {
+  _id: string;
+  companyName: string;
 }
 
 interface AdminProductFormProps {
@@ -19,7 +26,7 @@ interface AdminProductFormProps {
 }
 
 // Adjust initialProductState: category will now be string (ID) or null/empty string
-const initialProductState: Omit<Product, '_id' | 'images' | 'createdAt' | 'updatedAt' | 'isActive' | 'category'> & { category: string } = {
+const initialProductState: Omit<Product, '_id' | 'images' | 'createdAt' | 'updatedAt' | 'isActive' | 'category'> & { category: string } & { vendor?: string; currentPrice?: number; currency?: string } = {
   name: '',
   description: '',
   shortDescription: '',
@@ -28,10 +35,14 @@ const initialProductState: Omit<Product, '_id' | 'images' | 'createdAt' | 'updat
   specifications: {},
   certifications: [],
   packagingOptions: [],
+  vendor: '',
+  currentPrice: undefined,
+  currency: 'USD',
 };
 
 const AdminProductForm: React.FC<AdminProductFormProps> = ({ product, onFormSubmit, isEditMode = false }) => {
-  const [formData, setFormData] = useState<Omit<Product, '_id' | 'images' | 'createdAt' | 'updatedAt' | 'isActive' | 'category'> & { category: string }>(initialProductState);
+  const [searchParams] = useSearchParams();
+  const [formData, setFormData] = useState<Omit<Product, '_id' | 'images' | 'createdAt' | 'updatedAt' | 'isActive' | 'category'> & { category: string } & { vendor?: string; currentPrice?: number; currency?: string }>(initialProductState);
   const [specifications, setSpecifications] = useState<Record<string, string>>({}); 
   const [newSpecKey, setNewSpecKey] = useState('');
   const [newSpecValue, setNewSpecValue] = useState('');
@@ -43,6 +54,7 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({ product, onFormSubm
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [availableCategories, setAvailableCategories] = useState<CategoryOption[]>([]);
+  const [availableVendors, setAvailableVendors] = useState<VendorOption[]>([]);
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -55,7 +67,18 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({ product, onFormSubm
         // toast.error("Could not load categories"); // Consider adding toast here if it was re-added
       }
     };
+    const loadVendors = async () => {
+      try {
+        const apiUrl = await fetchApiUrl();
+        const response = await axios.get(`${apiUrl}/api/vendors?limit=1000`);
+        const items: IVendor[] = response.data?.data?.items || response.data?.data || [];
+        setAvailableVendors(items.map(v => ({ _id: v._id, companyName: v.companyName })));
+      } catch (error) {
+        console.error('Failed to fetch vendors for product form:', error);
+      }
+    };
     loadCategories();
+    loadVendors();
   }, []);
 
   useEffect(() => {
@@ -78,6 +101,9 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({ product, onFormSubm
         specifications: productSpecs || {},
         certifications: productCerts || [],
         packagingOptions: productPackages || [],
+        vendor: (product as any).vendor?._id || (product as any).vendor || '',
+        currentPrice: (product as any).currentPrice,
+        currency: (product as any).currency || 'USD',
       });
 
       setSpecifications(productSpecs || {});
@@ -96,6 +122,35 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({ product, onFormSubm
       setPackagingOptionsArray([]);
       setImagePreviews([]);
       setImages(null);
+      // Preselect vendor from query param if provided
+      const vendorId = searchParams.get('vendorId') || '';
+      if (vendorId) {
+        setFormData(prev => ({ ...prev, vendor: vendorId }));
+      }
+      // Prefill other fields from query params
+      const name = searchParams.get('name');
+      const price = searchParams.get('price');
+      const currency = searchParams.get('currency');
+      const unit = searchParams.get('unit');
+      const quantity = searchParams.get('quantity');
+      const packaging = searchParams.get('packaging');
+      const certs = searchParams.get('certs');
+      setFormData(prev => ({
+        ...prev,
+        name: name ?? prev.name,
+        currentPrice: price ? Number(price) : prev.currentPrice,
+        currency: currency || prev.currency,
+        ...(unit ? { unit } : {} as any),
+        ...(quantity ? { quantity: Number(quantity) } : {} as any),
+      } as any));
+      if (packaging) {
+        const parts = packaging.split(',').map(s => s.trim()).filter(Boolean);
+        setPackagingOptionsArray(parts);
+      }
+      if (certs) {
+        const parts = certs.split(',').map(s => s.trim()).filter(Boolean);
+        setCertificationsArray(parts);
+      }
     }
   }, [product, isEditMode]);
 
@@ -105,6 +160,7 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({ product, onFormSubm
     setFormData(prev => ({ ...prev, [name]: value })); 
   };
 
+  // Handlers restored after vendor/pricing additions
   const handleAddSpecification = () => {
     if (newSpecKey && newSpecValue) {
       setSpecifications((prev) => ({ ...prev, [newSpecKey]: newSpecValue }));
@@ -112,6 +168,7 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({ product, onFormSubm
       setNewSpecValue('');
     }
   };
+
   const handleRemoveSpecification = (key: string) => {
     setSpecifications((prev) => {
       const { [key]: _, ...rest } = prev;
@@ -125,6 +182,7 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({ product, onFormSubm
       setNewCertification('');
     }
   };
+
   const handleRemoveCertification = (index: number) => {
     setCertificationsArray((prev) => prev.filter((_, i) => i !== index));
   };
@@ -135,6 +193,7 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({ product, onFormSubm
       setNewPackagingOption('');
     }
   };
+
   const handleRemovePackagingOption = (index: number) => {
     setPackagingOptionsArray((prev) => prev.filter((_, i) => i !== index));
   };
@@ -159,11 +218,27 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({ product, onFormSubm
     productPayload.append('specifications', JSON.stringify(specifications));
     certificationsArray.forEach(cert => productPayload.append('certifications[]', cert));
     packagingOptionsArray.forEach(opt => productPayload.append('packagingOptions[]', opt));
+    if ((formData as any).unit) {
+      productPayload.append('unit', String((formData as any).unit));
+    }
+    if ((formData as any).quantity !== undefined && (formData as any).quantity !== null) {
+      productPayload.append('quantity', String((formData as any).quantity));
+    }
+    if (formData.vendor) {
+      productPayload.append('vendor', formData.vendor);
+    }
+    if (formData.currentPrice !== undefined && formData.currentPrice !== null) {
+      productPayload.append('currentPrice', String(formData.currentPrice));
+      if (formData.currency) {
+        productPayload.append('currency', formData.currency);
+      }
+    }
     if (images) {
       Array.from(images).forEach(image => {
         productPayload.append('images', image);
       });
     }
+
     try {
       await onFormSubmit(productPayload);
     } catch (error) {
@@ -256,6 +331,80 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({ product, onFormSubm
           </div>
         </div>
         
+        {/* Vendor and Pricing */}
+        <div className="space-y-6">
+          <h3 className="text-lg font-semibold text-white border-b border-gray-700 pb-2">Vendor & Pricing</h3>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+            <div className="sm:col-span-1">
+              <label htmlFor="vendor" className="block text-sm font-medium text-gray-300 mb-2">Vendor (optional)</label>
+              <select
+                id="vendor"
+                name="vendor"
+                value={formData.vendor || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, vendor: e.target.value }))}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">-- Select Vendor --</option>
+                {availableVendors.map(v => (
+                  <option key={v._id} value={v._id}>{v.companyName}</option>
+                ))}
+              </select>
+            </div>
+            <div className="sm:col-span-1">
+              <label htmlFor="currentPrice" className="block text-sm font-medium text-gray-300 mb-2">Price (optional)</label>
+              <input
+                type="number"
+                id="currentPrice"
+                value={formData.currentPrice ?? ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, currentPrice: e.target.value ? Number(e.target.value) : undefined }))}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="Enter price"
+                min={0}
+                step="0.01"
+              />
+            </div>
+            <div className="sm:col-span-1">
+              <label htmlFor="currency" className="block text-sm font-medium text-gray-300 mb-2">Currency</label>
+              <select
+                id="currency"
+                value={formData.currency || 'USD'}
+                onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="INR">INR</option>
+                <option value="CNY">CNY</option>
+              </select>
+            </div>
+            <div className="sm:col-span-1">
+              <label htmlFor="unit" className="block text-sm font-medium text-gray-300 mb-2">Unit (e.g., kg, piece)</label>
+              <input
+                type="text"
+                id="unit"
+                value={(formData as any).unit || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, unit: e.target.value }))}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="kg, piece, pack, etc."
+              />
+            </div>
+            <div className="sm:col-span-1">
+              <label htmlFor="quantity" className="block text-sm font-medium text-gray-300 mb-2">Quantity (optional)</label>
+              <input
+                type="number"
+                id="quantity"
+                value={(formData as any).quantity ?? ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value ? Number(e.target.value) : undefined }))}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="Available quantity"
+                min={0}
+                step="1"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Specifications */}
         <div className="space-y-6">
           <h3 className="text-lg font-semibold text-white border-b border-gray-700 pb-2">Specifications</h3>

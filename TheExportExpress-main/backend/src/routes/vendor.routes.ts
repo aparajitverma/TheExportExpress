@@ -17,7 +17,8 @@ import {
   getVendorPerformance,
   getVendorStats,
   bulkImportVendors,
-  getVendorTemplate
+  getVendorTemplate,
+  uploadVendorDocuments
 } from '../controllers/vendor.controller';
 
 // Create CSV upload middleware for vendors
@@ -83,6 +84,8 @@ router.patch('/:id/verify', verifyVendor);
 
 // Update vendor performance metrics
 router.patch('/:id/metrics', updateVendorMetrics);
+// Alias to support AdminService (uses POST)
+router.post('/:id/metrics', updateVendorMetrics);
 
 // Get vendor performance analytics
 router.get('/:id/performance', getVendorPerformance);
@@ -93,4 +96,42 @@ router.post('/bulk/import', uploadCSV, bulkImportVendors);
 // Get vendor template for CSV download
 router.get('/bulk/template', getVendorTemplate);
 
-export default router; 
+// ========= Vendor documents upload =========
+const vendorUploadDir = path.join(__dirname, '../../uploads/vendors');
+if (!fs.existsSync(vendorUploadDir)) {
+  fs.mkdirSync(vendorUploadDir, { recursive: true });
+}
+
+const vendorStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, vendorUploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + '-' + file.originalname);
+  },
+});
+
+const vendorFileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  // Allow images and PDFs for brochures/catalogs/certificates
+  const allowed = /jpeg|jpg|png|gif|webp|pdf/;
+  const ok = allowed.test(file.mimetype) || allowed.test(path.extname(file.originalname).toLowerCase());
+  if (ok) return cb(null, true);
+  cb(new Error('Only images and PDFs are allowed'));
+};
+
+const uploadVendorMedia = multer({
+  storage: vendorStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: vendorFileFilter,
+}).fields([
+  { name: 'catalogs', maxCount: 10 },
+  { name: 'brochures', maxCount: 10 },
+  { name: 'certificates', maxCount: 20 },
+  { name: 'other', maxCount: 50 },
+]);
+
+// Upload vendor documents (catalogs, brochures, certificates)
+router.patch('/:id/documents', uploadVendorMedia, uploadVendorDocuments);
+
+export default router;
